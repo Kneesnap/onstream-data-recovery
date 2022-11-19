@@ -10,7 +10,7 @@ It is however, incomplete, it only includes data from software with confirmed in
  - Compatible Drives: ALL EXCEPT MAC DRIVES (If your software version is new enough.)   
 
 ## ARCServe  
- - Known Compatible Versions: ARCServeIT >= version 6.61 build 204, ARCServe 2000, ARCServe v7.0 (Later versions may be compatible)  
+ - Known Compatible Versions: ARCServeIT >= version 6.61 build 834, ARCServe 2000, ARCServe v7.0 (Later versions may be compatible)  
  - OS Compatibility: Windows 98, Windows NT, Windows 2000, Windows XP  
  - Confirmed Compatible Drives: SC30/SC50, ADR30/ADR50
  - Data Pictures: [Picture #1](/pictures/data-formats/arcserve-header.png), [Picture #2](/pictures/data-formats/arcserve-datastart.png)
