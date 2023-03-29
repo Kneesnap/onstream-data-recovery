@@ -83,4 +83,5 @@ However, the "SC-" prefixed drives are able to read data written with "ADR-" dri
 [^3]: It is not clear why there was a separate SCSI drive released for Apple machines. It is unclear if it is possible to make other drives work with these old Apple machines or not.
   It seems the recommended software was Dantz Retrospect Backup, it is unknown what software may have been used beyond it.
   The drive is not supported in Mac OS X by Retrospect, but may still be supportable by porting the `os_dump` program.
+  According to the OnStream website, this drive is compatible with Windows. Perhaps all SC30e drives are Mac compatible?
 [^4]: This appears two ADR2.120Si drives put together into a 19-inch rack mount tape.
