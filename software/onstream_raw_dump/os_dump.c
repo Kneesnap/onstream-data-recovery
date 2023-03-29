@@ -41,10 +41,6 @@ const unsigned char msCmdBlk[] = {MODE_SELECT, 0x10, 0, 0, 8, 0,
 	4, 0, 0, 0,
 	0xb0, 2, 0, 0xa2
 };
-const unsigned char viCmdBlk[] = {MODE_SELECT, 0x10, 0, 0, 12, 0,
-	8, 0, 0, 0,
-	0xb6, 6, 'L', 'I', 'N', 'S', 0, 0
-};
 
 const char *prog = "os_dump";
 /* Options */
@@ -147,26 +143,6 @@ int onstream_set325 (int sg_fd)
 
 	rsghp->pack_id = 0;
 	res = do_cmnd (sg_fd, rbBuff, rbOutLen, rbInLen, "mode select");
-	if (rbBuff) free(rbBuff);
-	return res;
-}
-
-int onstream_appid (int sg_fd)
-{
-	int res;
-	unsigned char * rbBuff = malloc(OFF + sizeof (viCmdBlk));
-	struct sg_header * rsghp = (struct sg_header *)rbBuff;
-	int rbInLen = OFF;
-	int rbOutLen = OFF + sizeof (viCmdBlk);
-	memset(rbBuff, 0, OFF + sizeof(viCmdBlk));
-        rsghp->pack_len = 0;                /* don't care */
-        rsghp->reply_len = rbInLen;
-        rsghp->twelve_byte = 0;
-        rsghp->result = 0;
-        memcpy(rbBuff + OFF, viCmdBlk, sizeof(viCmdBlk));
-
-	rsghp->pack_id = 0;
-	res = do_cmnd (sg_fd, rbBuff, rbOutLen, rbInLen, "vendor ID");
 	if (rbBuff) free(rbBuff);
 	return res;
 }
