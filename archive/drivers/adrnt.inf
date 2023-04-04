@@ -1,0 +1,79 @@
+
+; ADRNT.INF -- This file contains descriptions of the ADR Tape
+;             Drives supported in Windows NT   1.09.000
+
+; Copyright (c) 1999, OnStream Inc.
+
+[version]
+signature="$Windows NT$"
+Class=TapeDrive
+ClassGUID={6D807884-7D21-11CF-801C-08002BE10318}
+Provider=%OStm%
+
+
+
+LayoutFile=splayout.inf, layout.inf
+
+
+[DestinationDirs]
+DefaultDestDir = 12 ; DIRID_DRIVERS
+
+[ControlFlags]
+;
+; Exclude the following devices from Select Device list.
+; These represent 'combination' driver nodes, for which there are separate
+; items presented to the user.  These combination nodes are only used when
+; figuring out what driver node to associate with a pre-existing service.
+;
+;ExcludeFromSelect = ADR117_TAPE
+
+[Manufacturer]
+"OnStream"
+
+;***************************
+; ADR additions
+[OnStream]
+%adr157.DeviceDesc%  = adr157_Inst, ADR157_TAPE
+
+[adr157_Inst]
+CopyFiles = @adrnt.sys
+
+[adr157_Inst.Services]
+AddService = adr157, %SPSVCINST_ASSOCSERVICE%, adr157_Service_Inst, adr157_EventLog_Inst
+
+[adr157_Service_Inst]
+ServiceType    = %SERVICE_KERNEL_DRIVER%
+StartType      = %SERVICE_SYSTEM_START%
+ErrorControl   = %SERVICE_ERROR_NORMAL%
+ServiceBinary  = %12%\adrnt.sys
+LoadOrderGroup = SCSI Class
+Dependencies   = +SCSI Miniport
+
+[adr157_EventLog_Inst]
+AddReg = adr157_EventLog_AddReg
+
+[adr157_EventLog_AddReg]
+HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\drivers\adrnt.sys"
+HKR,,TypesSupported,%REG_DWORD%,7
+
+
+
+;****************************
+;Alternate driver search list
+[AlternateDriverSearch]
+
+ADR157_TAPE  = "OnStream", "ADR50 Drive     "
+
+[Strings]
+OStm="Onstream"
+
+adr157.DeviceDesc="OnStream ADR50 Windows NT driver "
+
+;*******************************************
+;Handy macro substitutions (non-localizable)
+SPSVCINST_ASSOCSERVICE = 0x00000002
+SERVICE_KERNEL_DRIVER  = 1
+SERVICE_SYSTEM_START   = 1
+SERVICE_ERROR_NORMAL   = 1
+REG_EXPAND_SZ          = 0x00020000
+REG_DWORD              = 0x00010001

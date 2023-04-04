@@ -1,0 +1,58 @@
+[version]
+signature="$Windows NT$"
+Class=TapeDrive
+Provider="Perisoft"
+LayoutFile=layout.inf
+
+[DestinationDirs]
+DefaultDestDir = 12 ; (system32\drivers)
+
+[Manufacturer]
+"OnStream"
+
+;OnStream-manufacturer device list
+
+[OnStream]
+%OnStream.DeviceDesc% = OnStream_Inst, ONSTREAM_TAPE 
+
+[OnStream_Inst]
+CopyFiles = @SC30SC50.sys
+
+[Onstream_Inst.Services]
+AddService = SC30SC50, %SPSVCINST_ASSOCSERVICE%, Onstream_Service_Inst, OnStream_EventLog_Inst
+
+[OnStream_Service_Inst]
+ServiceType    = %SERVICE_KERNEL_DRIVER%
+StartType      = %SERVICE_SYSTEM_START%
+ErrorControl   = %SERVICE_ERROR_NORMAL%
+ServiceBinary  = %12%\SC30SC50.sys
+LoadOrderGroup = SCSI Class
+Dependencies   = +SCSI Miniport
+
+[OnStream_EventLog_Inst]
+AddReg = OnStream_EventLog_AddReg
+
+[OnStream_EventLog_AddReg]
+HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\drivers\SC30SC50.sys"
+HKR,,TypesSupported,%REG_DWORD%,7
+
+;Alternate driver search list
+[AlternateDriverSearch]
+
+ONSTREAM_TAPE = "OnStream", "SC-30"
+ONSTREAM_TAPE = "OnStream", "SC-50"
+ONSTREAM_TAPE = "OnStream", "SI-30"
+ONSTREAM_TAPE = "OnStream", "DI-30"
+ONSTREAM_TAPE = "OnStream", "DP-30"
+
+[Strings]
+Onstream.DeviceDesc="OnStream SC-30, SC-50, SI-50, DI-30, or DP-30 tape drive"
+
+;*******************************************
+;Handy macro substitutions (non-localizable)
+SPSVCINST_ASSOCSERVICE = 0x00000002
+SERVICE_KERNEL_DRIVER  = 1
+SERVICE_SYSTEM_START   = 1
+SERVICE_ERROR_NORMAL   = 1
+REG_EXPAND_SZ          = 0x00020000
+REG_DWORD              = 0x00010001

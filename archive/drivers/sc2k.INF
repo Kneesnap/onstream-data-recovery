@@ -1,0 +1,55 @@
+;------------------------------------------------------------------------------
+;  Copyright (C) Perisoft 2002
+;------------------------------------------------------------------------------
+
+[Version]
+Signature = "$Windows NT$"
+Provider  = "OnStream"
+ClassGUID = {6d807884-7d21-11cf-801c-08002be10318}    ; tape drive
+Class     = TapeDrive
+DriverVer = 02/18/2002,2.0.0.8
+
+[SourceDisksNames]
+1 = %DISKNAME%
+
+[SourceDisksFiles]
+sc2k.sys = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[Manufacturer]
+"OnStream" = OnStream.Mfg
+
+[OnStream.Mfg]
+%USB30NAME% = sc2k, IDE\SequentialOnStream_USB30__________________________
+%USB30NAME% = sc2k, SCSI\SequentialOnStreamUSB30___________
+%DI30NAME%  = sc2k, IDE\SequentialOnStream_DI-30__________________________
+%DI30NAME%  = sc2k, SCSI\SequentialOnStreamDI-30___________
+%DP30NAME%  = sc2k, SCSI\SequentialOnStreamDP-30___________
+%SC30NAME%  = sc2k, SCSI\SequentialOnStreamSC-30___________
+%SC50NAME%  = sc2k, SCSI\SequentialOnStreamSC-50___________
+%DI30NAME%  = sc2k, IDE\Sequential_OnStream_DI-30_________________________
+
+[ControlFlags]
+ExcludeFromSelect = *                                 ; plug and play detected
+
+[sc2k]
+CopyFiles = @sc2k.sys
+
+[sc2k.Services]
+AddService = sc2k, 2, sc2k_Service
+
+[sc2k_Service]
+ServiceType   = 1                                     ; SERVICE_KERNEL_DRIVER
+StartType     = 3                                     ; SERVICE_DEMAND_START
+ErrorControl  = 0                                     ; SERVICE_ERROR_IGNORE
+ServiceBinary = %12%\sc2k.sys
+
+[Strings]
+DISKNAME  = "OnStream Installation Disk"
+USB30NAME = "OnStream 30GB USB Tape Drive"
+DI30NAME  = "OnStream DI-30 Tape Drive"
+DP30NAME  = "OnStream DP-30 Tape Drive"
+SC30NAME  = "OnStream SC-30 Tape Drive"
+SC50NAME  = "OnStream SC-50 Tape Drive"

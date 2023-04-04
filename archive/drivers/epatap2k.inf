@@ -1,0 +1,73 @@
+; EPATAP2K.INF
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider=%MSFT%
+LayoutFile=layout.inf
+DriverVer=03/17/2000
+;Microsoft should provide on submitting the driver for WHQL tests
+;;;CatalogFile=epatap2k.cat
+
+; =================== Class Sections ===========================
+
+[ClassInstall32]
+Addreg=System_Class_addreg
+
+[system_class_addreg]
+HKR,,,,%SystemClassName%
+HKR,,Icon,,"-27"
+
+; =================== Table of content =========================
+[DestinationDirs]
+Generic_CopyFiles=12
+Scm_CopyFiles=12
+
+[SourceDisksNames]
+1 ="Install Disk", Disk1
+
+[SourceDisksFiles]
+epatap2k.sys=1
+
+[Manufacturer]
+%SCMMfg%= SCM_device
+
+[scm_copyfiles]
+epatap2k.sys
+
+; =================== FOR SCM
+[scm_device]
+%PARALLEL_PORT\STLPORT_SCM_PPDRIVE.DeviceDesc%=scm_install,LPTENUM\VID_04E6PID_800000022F57
+
+[scm_addreg]
+
+
+[scm_install]
+CopyFiles=scm_copyfiles
+
+[scm_install.HW]
+AddReg=scm_addreg
+
+[scm_install.Services]
+AddService = epatap2k,2,scm_ServiceInstallSection
+
+[scm_ServiceInstallSection]
+DisplayName=%SCM_ServiceDesc%
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %12%\epatap2k.sys
+LoadOrderGroup = SCSI miniport
+
+
+; =================== Generic ==================================
+
+[ControlFlags]
+
+[Strings]
+MSFT="Microsoft"
+SCM_ServiceDesc="SCM Parallel Port ATAPI Driver"
+SCMMfg ="SCM Corporation"
+PARALLEL_PORT\STLPORT_SCM_PPDRIVE.DeviceDesc="SCM PPort ATAPI Adapter"
+SystemClassName = "System devices"

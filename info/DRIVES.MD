@@ -62,6 +62,8 @@ However, the "SC-" prefixed drives are able to read data written with "ADR-" dri
 | SC-50 | May 19, 1999 | SCSI-2 (Internal, 50 Pin) | 2 MB/s | No | QIC-172 | [Front](/pictures/drives/sc50-front.png), [Back](/pictures/drives/sc50-back.png) |
 | DI-30 | May 19, 1999 | Internal IDE | 0.7 MB/s | No | ? | [Front](/pictures/drives/adr-di30-front.png), [Back](/pictures/drives/adr-di30-back.jpg), [Top](/pictures/drives/adr-di30-top.jpg) |
 | DI-30 FAST | May 19, 1999 | Internal IDE | 2 MB/s | No | ? | [Front](/pictures/drives/sc50-front.png), [DI-30 Fast](/pictures/drives/adr-di30-fast.jpg) |
+| DI-30+[^5] | ? | Internal IDE | 1 MB/s | No | ? | None |
+| DI-30+ FAST[^5] | ? | Internal IDE | 1 MB/s | No | ? | None |
 | DP-30 | May 19, 1999 | External Parallel Port | 0.7 MB/s | No | ? | [Front](/pictures/drives/sc50-front.png), [Back](/pictures/drives/adr-dp30.jpg) |
 | SC30e MAC[^3] | February 2000 | External SCSI | 2 MB/s | No | ? | [Rotated](/pictures/drives/sc30e.jpg) |
 | FW-30 | ? | External Firewire (Apple) | 2 MB/s | No | ? | [FW-30](/pictures/drives/adr-fw30.jpg) |
@@ -85,3 +87,4 @@ However, the "SC-" prefixed drives are able to read data written with "ADR-" dri
   The drive is not supported in Mac OS X by Retrospect, but may still be supportable by porting the `os_dump` program.
   According to the OnStream website, this drive is compatible with Windows. Perhaps all SC30e drives are Mac compatible?
 [^4]: This appears two ADR2.120Si drives put together into a 19-inch rack mount tape.
+[^5]: Be careful with these drives! Their name seems similar to the DI-30, but their firmware *NOT* intercompatible.  

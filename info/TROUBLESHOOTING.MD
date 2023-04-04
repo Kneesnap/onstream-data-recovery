@@ -52,9 +52,3 @@ If this doesn't work, the drive is probably broken, but there are physical ways 
 This issue seems to go away when I try a different PC motherboard.  
 Not a clue what's wrong with the first motherboard, but this motherboard sometimes also doesn't show the SCSI PCI card boot screen, and that has all sorts of issues.  
 So perhaps motherboards can cause weird issues like this one.  
-
-## Helpful Resources  
- - [OnStream Website Archive](https://web.archive.org/web/20030130111054/http://www.onstreamdata.com/)  
- - ['osst' Driver Website](https://osst.sourceforge.net/)  
- - ['osst' Driver Source Code](https://github.com/Kneesnap/osst)  
- - [Aaru Data Preservation Suite](https://github.com/aaru-dps/Aaru)  

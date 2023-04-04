@@ -15,3 +15,14 @@ The guide has been broken into several sections:
 ### General FAQ  
  - How does this jumper block thing work? Don't worry too much about it. Most of the SCSI PCI cards out there have an automatic termination setting enabled by default in the BIOS settings, and if you're not connecting any other SCSI devices, then it doesn't matter what ID is set.  
  - It is possible to use a 68pin to 50pin SCSI converter for the SCSI-2 based devices, but only if the converter properly terminates the 8-bit portion of the bus. Any competent adapter should do this automatically.  
+ 
+ 
+ ## Helpful Resources  
+ - [Archived Data](/archives/)
+ - [OnStream Website Archive](https://web.archive.org/web/20030130111054/http://www.onstreamdata.com/)  
+ - ['osst' Linux Driver Website](https://osst.sourceforge.net/)  
+ - ['osst' Driver Source Code](https://github.com/Kneesnap/osst) ([Original Repository](https://sourceforge.net/projects/osst/) [^1])  
+ - [Aaru Data Preservation Suite](https://github.com/aaru-dps/Aaru)  
+
+[^1]: The files shown on the website are not actually the full repository, instead the CVS repo must be directly connected to.
+  For this reason, the Github mirror is preferred.
