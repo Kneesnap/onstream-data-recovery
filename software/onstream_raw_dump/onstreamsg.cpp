@@ -1543,6 +1543,17 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	WaitForReady(pOnStream);
+	
+	if (false == StartFrameSet) {
+		if (false == pOnStream->ReadPosition()) {
+			Debug(0, "Failed to ReadPosition()"
+			delete pOnStream;
+			return 1;
+		}
+		
+		CurrentFrame = ntohl (*((UINT32*) &pResultBuffer[4]));
+		Debug(0, "The current tape position has been read as %d, but this may be wrong!\n", CurrentFrame
+	}
 
 	if (NULL != filename) {
 		if (NULL == (fil = fopen(filename, "w"))) {
@@ -1632,7 +1643,7 @@ int main(int argc, char* argv[])
 				Debug(2, "Old frame found in stream. Skipping...\n");
 				continue;
 			}
-			if (CurrentSeqNo == 0 && StartFrameSet) {
+			if (CurrentSeqNo == 0) {
 				CurrentSeqNo = AuxFrame.FrameSequenceNumber;
 			}
 			if (AuxFrame.FrameSequenceNumber < CurrentSeqNo) {
@@ -1649,10 +1660,6 @@ int main(int argc, char* argv[])
 				}
 				CurrentFrame -= AuxFrame.FrameSequenceNumber - CurrentSeqNo + 1;
 				Debug (0, "Jump Back to %i.\n", CurrentFrame);
-				if (CurrentFrame > second_cfg && CurrentFrame <= second_cfg + 5) {
-					if (adr_version < 10004) CurrentFrame -= 6;
-					else CurrentFrame -= 5;
-				}
 				if (false == pOnStream->Locate(CurrentFrame)) {
 					Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 					delete pOnStream;
@@ -1678,8 +1685,10 @@ int main(int argc, char* argv[])
 			if (!retry) eof = 1;
 			break;
 		default:
-			Debug(2, "Unknown frame 0x%04x at pos %d. Skipping.\n", 
+			Debug(2, "Unknown frame 0x%04x at pos %d. Reading anyways...\n", 
 			      AuxFrame.FrameType, CurrentFrame);
+			fwrite(buf, 1, 33280, fil);
+			totalBytes += 33280;
 		}
 	}
 	if (NULL != filename) {

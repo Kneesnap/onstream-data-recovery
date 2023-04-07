@@ -1,0 +1,1 @@
+g++ -g ./onstreamsg.cpp -o osg
