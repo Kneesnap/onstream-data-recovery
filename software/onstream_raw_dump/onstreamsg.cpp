@@ -38,6 +38,7 @@
 
 /*
  * Some changes done by Kurt Garloff (KG) <garloff@suse.de>, 2-3/2000
+ * Modified by Kneesnap in 2023 to be suitable for raw dumping.
  */
 
 /*
@@ -281,10 +282,7 @@ public:
 
 	bool StartRead(void);
 	bool Read(void* pBuffer);
-	bool StartWrite(void);
-	bool Write(void* pBuffer, unsigned int len);
 	bool ModeSense(void *sense);
-	bool DeleteBuffer(unsigned int number);
 	bool RequestSense(void *sense);
 	bool GetTapeParameters(unsigned char result[22]);
 	void GetLastSense(void *sense);
@@ -300,10 +298,6 @@ public:
 	bool Rewind(void);
 	bool LURewind(void);
 	bool LULoad(void);
-	bool LURetention(void);
-	bool LURetentionAndLoad(void);
-	bool LURewindAndEject(void);
-	bool LURetentionAndEject(void);
 	bool IsOnstream(void);
 
 	bool TestUnitReady(void);
@@ -336,7 +330,6 @@ private:
 	OnStreamError LastError;
 
 	void DumpSCSIResult(sg_header* pSG, UINT8* pBuffer);
-	bool WaitForWrite(const int nSec = 90, const int nUsec = 0);
 	bool WaitForRead(const int nSec = 90, const int nUsec = 0);
 	bool SCSICommand(const int nSec = 90, const int nUsec = 0);
 
@@ -385,39 +378,6 @@ void cpAndSwap(void *dest, void *source, unsigned int width)
 		sourcePos--;
 		destPos++;
 	}
-}
-
-void FormatAuxFrame(struct AUX_FRAME AuxFrame, unsigned char* FAuxFrame) 
-{
-	unsigned int counter;
-
-	memset(FAuxFrame, 0, 512);
-	memcpy(&FAuxFrame[4], &AuxFrame.ApplicationSig, 4);
-	cpAndSwap(&FAuxFrame[12], &AuxFrame.UpdateFrameCounter, 4);
-	cpAndSwap(&FAuxFrame[16], &AuxFrame.FrameType, 2);
-	FAuxFrame[20] = AuxFrame.PartitionDescription.PartitionNumber;
-	FAuxFrame[21] = 0x01; // Version
-	cpAndSwap(&FAuxFrame[22], &AuxFrame.PartitionDescription.WritePassCounter, 2);
-	cpAndSwap(&FAuxFrame[24], &AuxFrame.PartitionDescription.FirstFrameAddress, 4);
-	cpAndSwap(&FAuxFrame[28], &AuxFrame.PartitionDescription.LastFrameAddress, 4);
-	cpAndSwap(&FAuxFrame[44], &AuxFrame.FrameSequenceNumber, 4);
-	cpAndSwap(&FAuxFrame[48], &AuxFrame.LogicalBlockAddress, 8);
-	FAuxFrame[56] = 0x08; // Size
-	FAuxFrame[58] = AuxFrame.DataAccessTable.nEntries;
-
-	for (counter = 0; counter < AuxFrame.DataAccessTable.nEntries; counter++) {
-		cpAndSwap(&FAuxFrame[60 + (counter * 8)], &AuxFrame.DataAccessTable.DataAccessTableEntry[counter].size, 4);
-		cpAndSwap(&FAuxFrame[64 + (counter * 8)], &AuxFrame.DataAccessTable.DataAccessTableEntry[counter].LogicalElements, 2);
-		FAuxFrame[66 + (counter * 8)] = AuxFrame.DataAccessTable.DataAccessTableEntry[counter].flags;
-	}
-
-	cpAndSwap(&FAuxFrame[192], &AuxFrame.FilemarkCount, 4);
-	FAuxFrame[196] = 0xFF;
-	FAuxFrame[197] = 0xFF;
-	FAuxFrame[198] = 0xFF;
-	FAuxFrame[199] = 0xFF;
-	cpAndSwap(&FAuxFrame[200], &AuxFrame.LastMarkFrameAddress, 4);
-	memcpy(&FAuxFrame[224], AuxFrame.DriverUnique, 32);
 }
 
 void unFormatAuxFrame(unsigned char* FAuxFrame, struct AUX_FRAME *AuxFrame) {
@@ -612,21 +572,6 @@ bool OnStream::StartRead(void)
 	return SCSICommand();
 }
 
-bool OnStream::StartWrite(void) 
-{
-	NeedCommandBytes(6);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x0a; // WRITE
-	pCommandBuffer[1] = 0x01; // 7-2: reserved; 1: SILI; 0: Fixed
-	pCommandBuffer[2] = 0x00; // Transfer length, 23-16
-	pCommandBuffer[3] = 0x00; // Transfer length, 15-8
-	pCommandBuffer[4] = 0x00; // Transfer length, 7-0
-	pCommandBuffer[5] = 0x00; // reserved
-
-	return SCSICommand();
-}
-
 /* Acc. to OnStream, the vers. numbering is the following:
  * X.XX for released versions (X=digit), 
  * XXXY for unreleased versions (Y=letter)
@@ -739,29 +684,6 @@ bool OnStream::RequestSense(void *sense)
 
 	memmove(sense, pResultBuffer, 16);
 	return true;
-}
-
-bool OnStream::DeleteBuffer(unsigned int number) 
-{
-	NeedCommandBytes(14);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x15; // MODE SELECT
-	pCommandBuffer[1] = 0x10; // 7-5: reserved 4: PF 3-1: Reserved 0: SP
-	pCommandBuffer[2] = 0x00; // reserved
-	pCommandBuffer[3] = 0x00; // length (MSB)
-	pCommandBuffer[4] = 0x08; // Length 12 bytes of mode data
-	pCommandBuffer[5] = 0x00; // reserved
-	pCommandBuffer[6] = 0x07; // Mode data length
-	pCommandBuffer[7] = 0x00; // Medium type ??
-	pCommandBuffer[8] = 0x00; // reserved
-	pCommandBuffer[9] = 0x00; // block descriptor length
-	pCommandBuffer[10] = 0xB3; // 7: PS 6: reserved 5-0: Page code (33 Buffer Filling Page)
-	pCommandBuffer[11] = 0x02; // ??
-	pCommandBuffer[12] = 0x00; // reserved
-	pCommandBuffer[13] = number & 0xff;
-
-	return SCSICommand();
 }
 
 bool OnStream::ModeSense(void *sense)
@@ -937,30 +859,6 @@ bool OnStream::ReadPosition(void)
 	return SCSICommand();
 }
 
-bool OnStream::Write(void* pBuffer, unsigned int len) 
-{
-	if (len != 32768 && len != 33280 && len != 0)
-		return false;
-	
-	NeedCommandBytes(6 + len);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x0A; // WRITE
-	pCommandBuffer[1] = 0x01; // 7-1: reserved; 0: Fixed
-	pCommandBuffer[2] = 0x00; // Number of blocks in this write
-	pCommandBuffer[3] = 0x00; // Number of blocks in this write
-	if (len > 0)
-		pCommandBuffer[4] = 0x01; // Number of blocks in this write
-	else
-		pCommandBuffer[4] = 0x00; // Number of blocks in this write
-
-	pCommandBuffer[5] = 0x00; // reserved;
-	if (pBuffer != NULL)
-		memmove(&pCommandBuffer[6], pBuffer, len);
-
-	return SCSICommand();
-}
-
 bool OnStream::Locate(UINT32 nLogicalBlock, bool write) 
 {
 	if (write) {
@@ -1079,66 +977,6 @@ bool OnStream::LULoad(void)
 	return SCSICommand();
 }
 
-bool OnStream::LURetention(void) 
-{
-	NeedCommandBytes(6);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x1B; // LOAD/UNLOAD
-	pCommandBuffer[1] = 0x01; // 7-1: reserved; 0: Immed
-	pCommandBuffer[2] = 0x00; // reserved
-	pCommandBuffer[3] = 0x00; // reserved
-	pCommandBuffer[4] = 0x02; // 7-3: reserved; 2: LoEj; 1: Re-Ten; 0: Load
-	pCommandBuffer[5] = 0x00; // reserved
-
-	return SCSICommand();
-}
-
-bool OnStream::LURetentionAndLoad(void) 
-{
-	NeedCommandBytes(6);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x1B; // LOAD/UNLOAD
-	pCommandBuffer[1] = 0x01; // 7-1: reserved; 0: Immed
-	pCommandBuffer[2] = 0x00; // reserved
-	pCommandBuffer[3] = 0x00; // reserved
-	pCommandBuffer[4] = 0x03; // 7-3: reserved; 2: LoEj; 1: Re-Ten; 0: Load
-	pCommandBuffer[5] = 0x00; // reserved
-
-	return SCSICommand();
-}
-
-bool OnStream::LURewindAndEject(void) 
-{
-	NeedCommandBytes(6);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x1B; // LOAD/UNLOAD
-	pCommandBuffer[1] = 0x01; // 7-1: reserved; 0: Immed
-	pCommandBuffer[2] = 0x00; // reserved
-	pCommandBuffer[3] = 0x00; // reserved
-	pCommandBuffer[4] = 0x04; // 7-3: reserved; 2: LoEj; 1: Re-Ten; 0: Load
-	pCommandBuffer[5] = 0x00; // reserved
-
-	return SCSICommand();
-}
-
-bool OnStream::LURetentionAndEject(void) 
-{
-	NeedCommandBytes(6);
-	NeedResultBytes(0);
-
-	pCommandBuffer[0] = 0x1B; // LOAD/UNLOAD
-	pCommandBuffer[1] = 0x01; // 7-1: reserved; 0: Immed
-	pCommandBuffer[2] = 0x00; // reserved
-	pCommandBuffer[3] = 0x00; // reserved
-	pCommandBuffer[4] = 0x06; // 7-3: reserved; 2: LoEj; 1: Re-Ten; 0: Load
-	pCommandBuffer[5] = 0x00; // reserved
-
-	return SCSICommand();
-}
-
 bool OnStream::TestUnitReady(void) 
 {
 	NeedCommandBytes(6);
@@ -1152,35 +990,6 @@ bool OnStream::TestUnitReady(void)
 	pCommandBuffer[5] = 0x00; // reserved
 
 	return SCSICommand();
-}
-
-//***********************************************
-// WaitForWrite: wait for the specified file descriptor to become ready for writing
-// Inputs:  file descriptor to wait on and optional timeout
-// Outputs: true if ready for writing
-//          false if an error occured or not ready within timeout period
-bool OnStream::WaitForWrite(const int nSec, const int nUsec) 
-{
-	fd_set fds;
-	timeval tv;
-	int rc;
-
-	FD_ZERO(&fds);
-	FD_SET(nFD, &fds);
-	tv.tv_sec = nSec;
-	tv.tv_usec = nUsec;
-
-	while (true) {
-		rc = select(nFD + 1, NULL, &fds, NULL, &tv);
-		if (rc > 0)
-			return true;
-
-		if ((rc < 0) && (EINTR != errno))
-			return false;
-
-		if (0 == rc)
-			return false;
-	}
 }
 
 //***********************************************
@@ -1251,12 +1060,6 @@ bool OnStream::SCSICommand(const int nSec, const int nUsec)
 	pSG->reply_len   = cbSGHeader + cbResultBuffer;
 
 	memmove(&pTempBuffer[cbSGHeader], pCommandBuffer, cbCommandBuffer);
-
-	Debug(7, "Waiting for write...");
-	if (false == WaitForWrite(nSec, nUsec)) {
-		LastError = oseDeviceWriteTimeout;
-		return false;
-	}
 
 	Debug(7, "Sending command of %d bytes...", cbCommandBuffer);
 	rc = write(nFD, pTempBuffer, cbCommandBuffer + cbSGHeader);
@@ -1538,189 +1341,6 @@ enum Sense CheckSense(OnStream *pOnStream)
 	}
 }
 
-bool DeleteFrames(TAPEBUFFER** FirstBuffer, unsigned int EntriesToDelete) 
-{
-	TAPEBUFFER *ThisTapeBuffer = *FirstBuffer, *NextTapeBuffer;
-	unsigned int counter = 0;
-
-	while (counter < EntriesToDelete && ThisTapeBuffer != NULL) {
-		Debug(6, "counter = %d, Entries to Delete = %d, ThisTapeBuffer = %p, ThisTapeBuffer->Next = %p\n", counter, EntriesToDelete, ThisTapeBuffer, ThisTapeBuffer->Next);
-		free(ThisTapeBuffer->Frame);
-		NextTapeBuffer = ThisTapeBuffer->Next;
-		free(ThisTapeBuffer);
-		ThisTapeBuffer = NextTapeBuffer;
-		counter++;
-		TotalBufferedFrames--;
-	}
-	if (counter < EntriesToDelete && ThisTapeBuffer == NULL) {
-		return false;
-	}
-	Debug(6, "Total: %d buffered frames\n", TotalBufferedFrames);
-	*FirstBuffer = ThisTapeBuffer;
-	return true;
-}
-
-void CheckWrittenFrames(OnStream *pOnStream, TAPEBUFFER** FirstBuffer, 
-			unsigned int addedFrames, unsigned int* previousFrames) 
-{
-	unsigned int MaxBuffer, CurrentBuffer, writtenFrames;
-
-	pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-
-	writtenFrames = *previousFrames - (CurrentBuffer - addedFrames);
-	Debug(6, "Current Buffered Frames: %d Deleting: %d\n", TotalBufferedFrames, writtenFrames);
-	if (!DeleteFrames(FirstBuffer, writtenFrames)) {
-		Debug(0, "Internal Frame Buffer/Tape buffer mismatch!\n");
-		//exit(-1);
-	}
-	*previousFrames = CurrentBuffer;
-}
-
-bool FlushBuffer(OnStream *pOnStream) 
-{
-	unsigned int MaxBuffer, CurrentBuffer;
-
-	if (false == pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer)) {
-		return false;
-	}
-	if (0 == CurrentBuffer) {
-		return true;
-	}
-	Debug(3, "Buffer has %d blocks in it. Flushing.\n", CurrentBuffer);
-	return pOnStream->DeleteBuffer(CurrentBuffer);
-}
-
-unsigned int RequeueData(OnStream *pOnStream, TAPEBUFFER** TapeBuffer, 
-			 unsigned int addedFrames, unsigned int *CurrentBuffer, 
-			 unsigned int skip, bool fRetry = false) 
-{
-	unsigned char sense[16];
-	unsigned int CurrentFrame, BadFrames;
-	unsigned int counter;
-
-	TAPEBUFFER *ThisTapeBuffer;
-
-	if (!fRetry) {
-		pOnStream->GetLastSense(sense);
-		pOnStream->ShowPosition(NULL, &CurrentFrame);
-
-		if (debug > 2) {
-			for (counter = 0; counter < 16; counter++) {
-				Debug(3, "%02x ", (unsigned char) sense[counter]);
-			}
-			Debug(3, "\n");
-		}
-
-		CheckWrittenFrames(pOnStream, TapeBuffer, addedFrames, CurrentBuffer);
-#if 0
-		if (sense[0] != 0x70 && sense[0] != 0x71) {
-			Debug(2, "No Sense? Assuming 1 block? Retrying operation...\n");
-			BadFrames = 1;
-		} else {
-			cpAndSwap(&CurrentFrame, &sense[3], 4);
-			BadFrames = (unsigned int) (unsigned char) sense[9];
-			Debug(2, "Write error on frame %d. Skipping %d frames.\n", CurrentFrame, BadFrames);
-		}
-#else
-		BadFrames = skip;
-#endif
-		Debug(3, "Current Frames in tape buffer: %d Current Frames in system buffer: %d\n", *CurrentBuffer, TotalBufferedFrames);
-		if (*CurrentBuffer != TotalBufferedFrames) {
-			Debug(0, "Tape/system buffer mismatch. Aborting!\n");
-			exit(-1);
-		}
-		Debug(3, "Clearing tape's buffer...");
-		pOnStream->DeleteBuffer(*CurrentBuffer);
-		if (CheckSense(pOnStream)) {
-			exit(-1);
-		}
-		Debug(3, "Done.\nMoving past bad blocks...");
-	} else {
-		pOnStream->ShowPosition(NULL, &CurrentFrame);
-		Debug(2, "Retrying write operation...");
-		BadFrames = 0;
-	}
-	
-	if (false == pOnStream->Locate(CurrentFrame + BadFrames)) {
-		Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-		delete pOnStream;
-		exit(-1);
-	}
-	WaitForReady(pOnStream);
-	Debug(2, "Done.\n");
-	ThisTapeBuffer = *TapeBuffer;
-	while (ThisTapeBuffer != NULL) {
-		AUX_FRAME temp;
-		unFormatAuxFrame(&ThisTapeBuffer->Frame[32768], &temp);
-		Debug(2, "Resending frame (Seq No = %ld)...", temp.FrameSequenceNumber);
-		if (false == pOnStream->Write(ThisTapeBuffer->Frame, 33280)) {
-			Debug(0, "main: write failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			delete pOnStream;
-			exit(-1);
-		}
-		Debug(2, "Done.\n");
-		ThisTapeBuffer = ThisTapeBuffer->Next;
-	}
-	Debug(2, "All data requeued. We now return you to your regularly scheduled programming.\n");
-	return BadFrames;
-}
-
-void WaitForWrite(OnStream *pOnStream, TAPEBUFFER** TapeBuffer, unsigned int *CurrentTapeBuffer) 
-{
-	// Wait for Write
-	unsigned int CurrentBuffer, MaxBuffer;
-	int skip; unsigned char sense[16];
-	Sense CurrentSense;
-
-	pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-	while (CurrentBuffer > 0) {
-		if (false == pOnStream->Write(NULL, 0)) {
-			Debug(0, "main: write failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			CheckSense(pOnStream);
-			delete pOnStream;
-			exit(-1);
-		}
-		switch (CurrentSense = CheckSense(pOnStream)) {
-		case SNoSense:
-			CheckWrittenFrames(pOnStream, TapeBuffer, 0, CurrentTapeBuffer);
-			break;
-		case SMediumWriteError:
-			pOnStream->GetLastSense (sense); 
-			skip = (unsigned int) sense[9];
-			if (!skip) skip = 80;
-			RequeueData(pOnStream, TapeBuffer, 0, CurrentTapeBuffer, 80);
-			break;
-		default:
-			Debug(0, "Unhandled sense %d\n", CurrentSense);
-			exit(-1);
-		}
-		sleep(1);
-		pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-	}
-}
-
-
-void AddFrameToBuffer(TAPEBUFFER **LastBuffer, void *buf) 
-{
-	TAPEBUFFER *ThisTapeBuffer;
-
-	Debug(6, "Adding 1 frame to tape buffer\n");
-	ThisTapeBuffer = (TAPEBUFFER *) malloc(sizeof(TAPEBUFFER));
-	ThisTapeBuffer->Next = NULL;
-	if (*LastBuffer != NULL)
-		(*LastBuffer)->Next = ThisTapeBuffer;
-
-	if (TapeBuffer == NULL)
-		TapeBuffer = *LastBuffer;
-
-	ThisTapeBuffer->Frame = (unsigned char *) malloc(33280);
-	memcpy(ThisTapeBuffer->Frame, buf, 33280);
-	TotalBufferedFrames++;
-	Debug(6, "Total: %d buffered frames\n", TotalBufferedFrames);
-
-	*LastBuffer = ThisTapeBuffer;
-}
-
 void Debug(const int nDebugLevel, const char *format, ...) 
 {
 	char data[1024];
@@ -1761,8 +1381,7 @@ int main(int argc, char* argv[])
 	/* The ADR version: 1000*major + 2*minor */
  	unsigned int adr_version;
 	/* StartFrame and second_cfg were different in old versions */
-	unsigned int StartFrame = 10;
-	unsigned int second_cfg = 0xBAE;
+	unsigned int StartFrame = 0;
 	bool StartFrameSet = false;
 	char option;
 	time_t startTime;
@@ -1777,20 +1396,11 @@ int main(int argc, char* argv[])
 	int help = 0;
 	char deviceName[32];
 	int rewind = 0;
-	int retention = 0;
 	int multiple = 0;
 
 	opterr = 0; // Supress errors from getops
-	while ((option = getopt(argc, argv, "trwmid::f:l:s:n:")) != EOF) {
+	while ((option = getopt(argc, argv, "rd::f:l:s:n:")) != EOF) {
 		switch (option) {
-		case 'w':
-			// Write mode
-			mode = 1;
-			break;
-		case 'm':
-			// Multiple tape mode
-			multiple = 1;
-			break;
 		case 'd':
 			if ((debug = atoi(optarg)) == 0) {
 				debug = 1;
@@ -1798,12 +1408,6 @@ int main(int argc, char* argv[])
 			break;
 		case 'r':
 			rewind = 1;
-			break;
-		case 't':
-			retention = 1;
-			break;
-		case 'i':
-			format = 1;
 			break;
 		case 'l':
 			logfilename = strdup(optarg);
@@ -1817,26 +1421,19 @@ int main(int argc, char* argv[])
 		case 's':
 			StartFrameSet = true;
 			StartFrame = atoi(optarg);
-			if (StartFrame == 0) {
-				help = 1;
-			}
 			break;
 		}
 	}
 
 	if (help || SCSIDeviceNo == -1) {
 		fprintf(stderr, "%s: SCSI Generic OnStream Tape interface. Written by Terry Hardie.\nVersion %s\n", argv[0], VERSION);
-		fprintf(stderr, "usage: %s -n device no [-d [level]] [-o filename] [-s block] [-w]\n", argv[0]);
+		fprintf(stderr, "usage: %s -n device_num [-d [level]] [-o filename] [-s block]\n", argv[0]);
 		fprintf(stderr, "       -n device No SCSI device number of OnStream drive **\n");
 		fprintf(stderr, "       -d [level]   set debug mode to level\n");
-		fprintf(stderr, "       -i           initialize, if tape is in an unknown format\n");
 		fprintf(stderr, "       -l filename  write debugging output to named file\n");
-		fprintf(stderr, "       -m           Multiple tape mode ***\n");
-		fprintf(stderr, "       -f filename  Use named file for data source/deposit\n");
-		fprintf(stderr, "       -r           Rewind tape when operation completes successfully\n");
-		fprintf(stderr, "       -s block     start reading from this block, instead of start of tape\n");
-		fprintf(stderr, "       -t           ReTension the tape before doing any read/write\n");
-		fprintf(stderr, "       -w           write mode\n");
+		fprintf(stderr, "       -f filename  Use named file for data output\n");
+		fprintf(stderr, "       -r           Rewind tape (and do nothing else)\n");
+		fprintf(stderr, "       -s block     start reading from this block, instead of current position\n");
 		fprintf(stderr, "\n");
 		fprintf(stderr, "** This is not the SCSI ID number, but rather which numbered device in\n");
 		fprintf(stderr, "   the bus this device is. For Eaxmple, if you have a hard drive at ID 2,\n");
@@ -1878,619 +1475,217 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	do {
-		Debug(2, "Initializing.\n");
+	
+	Debug(2, "Initializing.\n");
 
-		pOnStream->VendorID((char *) VENDORID);
-		if (CheckSense(pOnStream)) {
-			return -1;
-		}
+	pOnStream->VendorID((char *) VENDORID);
+	if (CheckSense(pOnStream)) {
+		return -1;
+	}
 
-		WaitForReady(pOnStream);
-
-		if (retention) {
-			Debug(1, "Retentioning - This may take some time...");
-			pOnStream->LURetentionAndLoad();
-			WaitForReady(pOnStream);
-			Debug(1, "Done.\n");
-		}
-
-		Debug(2, "Loading.\n");
-		pOnStream->LULoad();
-		WaitForReady(pOnStream);
-
-		pOnStream->DataTransferMode(true);
-		CheckSense(pOnStream);
-
-		/*
-		if (!FlushBuffer(pOnStream) || CheckSense(pOnStream)) {
-			Debug(0, "Can't flush buffer from drive.\n");
-			return -1;
-		}*/
-
-/* What's the reason for this? Shouldn't a locate clear all bufs? */
-#if 1
-		pOnStream->Drain();
-#endif
-		WaitForReady(pOnStream);
-		
-		tp = GetTapeParameters(pOnStream);
-		CheckSense(pOnStream);
-		
-		if (tp.SegTrk == 19239 && tp.Trks == 24) {
-			TotalFrames = tp.SegTrk * tp.Trks;
-			capacity = (long long) (TotalFrames) * 32768;
-		} else {
-			TotalFrames = (tp.SegTrk - 99) * tp.Trks;
-			capacity = (long long) (TotalFrames) * 32768;
-		}
-		Debug(2, "Density: %d\nSegTrk: %d\nTrks: %d\n", tp.Density, tp.SegTrk, tp.Trks);
-		Debug(2, "Capacity: ");
-		Debug(2, "%Ld bytes\n", capacity);
-		pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-		CurrentTapeBuffer = CurrentBuffer;
-
-
-		Debug(2, "Locating Config.\n");
-		if (false == pOnStream->Locate(5)) {
-			Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+	WaitForReady(pOnStream);
+	
+	if (rewind) {
+		Debug(2, "Rewinding...");
+		if (false == pOnStream->Rewind()) {
+			Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 			delete pOnStream;
 			return 1;
 		}
 
-		CurrentFrame = 5;
-
 		WaitForReady(pOnStream);
+		Debug(2, "Done.\n");
+		return 0;
+	}
+	
+		
+	// Do not call LOAD, because we are assuming hotswap!.
 
-		Debug(2, "Reading config\n");
-		if (false == pOnStream->StartRead()) {
-			Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			delete pOnStream;
+	pOnStream->DataTransferMode(true);
+	CheckSense(pOnStream);
+
+	// A locate should clear all buffers, but we're designing this with hotswaps in mind so...
+	pOnStream->Drain();
+	WaitForReady(pOnStream);
+	
+	tp = GetTapeParameters(pOnStream);
+	CheckSense(pOnStream);
+		
+	if (tp.SegTrk == 19239 && tp.Trks == 24) {
+		TotalFrames = tp.SegTrk * tp.Trks;
+		capacity = (long long) (TotalFrames) * 32768;
+	} else {
+		TotalFrames = (tp.SegTrk - 99) * tp.Trks;
+		capacity = (long long) (TotalFrames) * 32768;
+	}
+	Debug(2, "Density: %d\nSegTrk: %d\nTrks: %d\n", tp.Density, tp.SegTrk, tp.Trks);
+	Debug(2, "Capacity: ");
+	Debug(2, "%Ld bytes\n", capacity);
+	pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
+	CurrentTapeBuffer = CurrentBuffer;
+
+	WaitForReady(pOnStream);
+
+	if (StartFrameSet && false == pOnStream->Locate(StartFrame)) {
+		Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+		delete pOnStream;
+		return 1;
+	}
+
+	CurrentFrame = StartFrame;
+	WaitForReady(pOnStream);
+
+	Debug(2, "Starting read\n");
+
+	if (false == pOnStream->StartRead()) {
+		Debug(0, "main: StartRead failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+		delete pOnStream;
+		return 1;
+	}
+	WaitForReady(pOnStream);
+
+	if (NULL != filename) {
+		if (NULL == (fil = fopen(filename, "w"))) {
+			Debug(0, "Can't open file %s for writing - Error %s\n", filename, strerror(errno));
 			return 1;
 		}
-		WaitForReady(pOnStream);
+	} else {
+		fil = stdout;
+	}
+		
+	startTime = time(NULL);
+	CurrentSeqNo = 0;
+
+	while (!eof && !signalled) {
 		if (OS_NEED_POLL(pOnStream->FWRev()))
-			pOnStream->WaitPosition (CurrentFrame, 300);
-
-		/* TODO: Check frames 6-9, 2990-2994, if 5 is invalid */
-		if (false == pOnStream->Read(buf)) {
-			Debug(0, "main: Read 0 failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			delete pOnStream;
-			return 1;
+			CurrentSense = pOnStream->WaitPosition (CurrentFrame);
+		else
+			CurrentSense = SNoSense;
+		if (CurrentSense == SNoSense) {
+			if (false == pOnStream->Read(buf)) {
+				Debug(0, "main: Read 0 failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+				delete pOnStream;
+				return 1;
+			}
+			CurrentSense = CheckSense(pOnStream);
 		}
-		CurrentFrame++;
-
-		if ((strncmp((char *) buf, "ADR-SEQ", 7) == 0 || strncmp ((char *) buf, "ADR_SEQ", 7) == 0)
-		    && buf[8] == 0x01				// ADR Major
-		    && (buf[9] == 0x01 || buf[9] == 0x02)	// ADR Minor
-		    && buf[21] == 0x01)				// Partit. Desc. Version
-		{
-			FormatUnderstood = 1;
-			adr_version = 1000*buf[8] + 2*buf[9];
-			Debug(2, "Tape format understood: ADR%cSEQ, %i.%i\n",
-			      buf[3], buf[8], buf[9]);
-			if (adr_version < 1004) {
-				second_cfg = 0xBB2;
-				if (!StartFrameSet) StartFrame = 16;
+		switch (CurrentSense) {
+		case SNoSense:
+			break;
+		case SUnrecoveredReadError:
+		case STimeoutWaitPos:
+			// See if the next readable frame has our data in it.
+			Debug(2, "Unrecoverable read error at frame %ld. Checking next block...\n", CurrentFrame);
+			if (retry++ > 5) {
+				eof = 1;
+				continue;
 			}
-			unFormatAuxFrame(&buf[32768], &AuxFrame);
-			cpAndSwap(&WritePass, &buf[22], 2);
-		} else {
-			FormatUnderstood = 0;
-			Debug(2, "Tape format not understood.\n");
-			if (!format) {
-				Debug(2, "Signature found: '%s' '%02x' '%02x' '%02x'\n",
-				      truncstring ((char*)buf, 7),
-				      buf[8], buf[9], buf[21]);
-				Debug(0, "Please re-run with format option.\n");
-				return 1;
-			}
-			if (mode != 1) {
-				return 1;
-			}
-		}
-
-		if (mode == 1) {
-			// write
-			// Check if the tape has valid config...
-
-			if (FormatUnderstood) {
-				// The tape is configured correctly. Increment the write pass counter
-				Debug(2, "Tape is formatted already.\n");
-				Debug(2, "Current write pass is %d. Incrementing\n", WritePass);
-				WritePass++;
-				cpAndSwap(&buf[22], &WritePass, 2);
-				AuxFrame.UpdateFrameCounter++;
-				memcpy(&AuxFrame.ApplicationSig, VENDORID, 4);
-			} else {
-				// First, we need to write config frames. Setup their stucture:
-				Debug(0, "Tape format is not recognised. Reformatting.\n");
-				memset(buf, 0, 33280);
-				memset(&AuxFrame, 0, sizeof(AuxFrame));
-				strcpy((char *) buf, "ADR-SEQ");
-				buf[8] = 0x01; // Major Rev
-				buf[9] = 0x02; // Minor Rev
-				buf[16] = 0x01; // Number of partitions
-				buf[20] = 0x00; // Partition number
-				buf[21] = 0x01; // Partition version
-				buf[27] = 0x0A; // Start of user partition
-				adr_version = 1000*buf[8] + 2*buf[9];
-				cpAndSwap(&buf[28], &TotalFrames, 4);
-				memcpy(&AuxFrame.ApplicationSig, VENDORID, 4);
-				AuxFrame.UpdateFrameCounter = 0;
-				AuxFrame.FrameType = 0x0800; // Header Frame
-				AuxFrame.PartitionDescription.PartitionNumber = 0xFF;
-				AuxFrame.PartitionDescription.WritePassCounter = 0xFFFF;
-				AuxFrame.PartitionDescription.FirstFrameAddress = 0x00;
-				AuxFrame.PartitionDescription.LastFrameAddress = 0xBB7;
-				AuxFrame.LastMarkFrameAddress = 0xFFFFFFFF;
-				WritePass = 0;
-			}
-			FormatAuxFrame(AuxFrame, &buf[32768]);
-
-			Debug(2, "Writing Config frames (0x05 - 0x09)...");
-
-			CurrentFrame = 5;
-			if (false == pOnStream->Locate(5)) {
+			if (CurrentSense == SUnrecoveredReadError) CurrentFrame++;
+			else CurrentFrame += 40;
+			if (false == pOnStream->Locate(CurrentFrame)) {
 				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 				delete pOnStream;
 				return 1;
 			}
-			WaitForReady(pOnStream);
-
-			while (CurrentFrame < 0x0A) {
-				if (false == pOnStream->Write(buf, 33280)) {
-					Debug(0, "main: write failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-					delete pOnStream;
-					return 1;
-				}
-				AddFrameToBuffer(&LastTapeBuffer, buf);
-				CheckWrittenFrames(pOnStream, &TapeBuffer, 1, &CurrentTapeBuffer);
-				CurrentFrame++;
-			}
-			pOnStream->Flush();
-			WaitForReady(pOnStream);
-			if (OS_NEED_POLL(pOnStream->FWRev()))
-			    pOnStream->WaitPosition(CurrentFrame, 100, 1);
-			
-			Debug(2, "(0x%03x - 0x%03x)...", second_cfg, second_cfg+4);
-			CurrentFrame = second_cfg;
-			if (false == pOnStream->Locate(CurrentFrame, true)) {
-				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-				delete pOnStream;
-				return 1;
-			}
-			WaitForReady(pOnStream);
-			
-			while (CurrentFrame < second_cfg + 5) {
-				if (false == pOnStream->Write(buf, 33280)) {
-					Debug(0, "main: write failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-					delete pOnStream;
-					return 1;
-				}
-				AddFrameToBuffer(&LastTapeBuffer, buf);
-				CheckWrittenFrames(pOnStream, &TapeBuffer, 1, &CurrentTapeBuffer);
-				CurrentFrame++;
-			}
-			pOnStream->Flush();
-			WaitForReady(pOnStream);
-			if (OS_NEED_POLL(pOnStream->FWRev()))
-			    pOnStream->WaitPosition (CurrentFrame, 100, 1);
-			Debug(2, "Done.\nRewinding to start of user data (Frame = %d)\n", StartFrame);
-
-			if (false == pOnStream->Locate(StartFrame, true)) {
-				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-				delete pOnStream;
-				return 1;
-			}
-			WaitForReady(pOnStream);
-			pOnStream->ShowPosition(NULL, NULL);
-			CurrentFrame = StartFrame;
-			//if (OS_NEED_POLL(pOnStream->FWRev()))
-			    // pOnStream->WaitPosition (CurrentFrame, 50);
-
-			// Setup AuxFrame for user data
-			memset(&AuxFrame, 0, sizeof(AuxFrame));
-			memcpy(&AuxFrame.ApplicationSig, VENDORID, 4);
-			AuxFrame.UpdateFrameCounter = 0x00;
-			AuxFrame.FrameType = 0x8000;
-			AuxFrame.PartitionDescription.PartitionNumber = 0x00;
-			AuxFrame.PartitionDescription.WritePassCounter = WritePass;
-			AuxFrame.PartitionDescription.FirstFrameAddress = 0xA;
-			AuxFrame.PartitionDescription.LastFrameAddress = TotalFrames;
-			AuxFrame.DataAccessTable.nEntries = 0x01;
-			AuxFrame.FrameSequenceNumber = 0;
-			AuxFrame.LogicalBlockAddress = 0;
-			AuxFrame.LastMarkFrameAddress = 0xFFFFFFFF;
-
-			if (NULL != filename) {
-				if (NULL == (fFile = fopen(filename, "r"))) {
-					Debug(0, "Can't open file %s for reading - error %s\n", filename, strerror(errno));
-					return 1;
-				}
-				Debug(4, "Opened file %s for reading\n", filename);
-			}
-
-			Debug(3, "main: starting write\n");
-			startTime = time(NULL);
-			unsigned char * readbuf = (unsigned char *) malloc (131072);
-			char endpad = 0;
-			while ((feof(fFile) == 0 || endpad) && !signalled) {
-				if (!retry) {
-					//memset(buf, 0, 33280);
-					if (!(AuxFrame.FrameSequenceNumber % 4))
-					{
-						rc = fread(readbuf, 1, 131072, fFile);
-						totalBytes += rc;
-						if (rc < 131072)
-						{
-							memset(readbuf, 0, 131072-rc);
-							endpad = rc / 32768;
-						}
-					}
-					else
-						if (endpad) endpad--;
-					memcpy(buf, readbuf+32768*(AuxFrame.FrameSequenceNumber % 4), 32768);
-					if (feof(fFile) && !endpad) AuxFrame.DataAccessTable.DataAccessTableEntry[0].size = rc % 32768;
-					else AuxFrame.DataAccessTable.DataAccessTableEntry[0].size = 32768;
-					AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements = 1;
-					AuxFrame.DataAccessTable.DataAccessTableEntry[0].flags = 0xC;
-
-					FormatAuxFrame(AuxFrame, &buf[32768]);
-				}
-				if (debug > 9) {
-					int counter;
-					for (counter = 32768; counter <= 33280; counter++) {
-						Debug(10, "%02x ", (unsigned char) buf[counter]);
-						if (counter / 16.0 == counter / 16) {
-							Debug(10, "\n");
-						}
-					}
-
-					Debug(10, "Read %d bytes\n", rc);
-					Debug(10, "Writing block %ld\n", CurrentFrame);
-				}
-							    
-				if (OS_NEED_POLL(pOnStream->FWRev()))
-					CurrentSense = pOnStream->WaitPosition (CurrentFrame, 30, MAX_FILL_BUFF);
-				else
-					CurrentSense = SNoSense;
-				if (CurrentSense == SNoSense) {
-					if (false == pOnStream->Write(buf, 33280)) {
-						Debug(0, "main: write failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						CheckSense(pOnStream);
-						delete pOnStream;
-						return 1;
-					}
-					CurrentSense = CheckSense(pOnStream);
-				}
-				/* if we cant't get this info from the sense, let's assume 80
-				 * bad frames */
-				int skip = 80;
-				char sense[16];
-				switch (CurrentSense) {
-				case SNoSense:
-					retry = 0;
-					AddFrameToBuffer(&LastTapeBuffer, buf);
-					AuxFrame.FrameSequenceNumber++;
-					AuxFrame.LogicalBlockAddress++;
-					CurrentFrame++;
-					CheckWrittenFrames(pOnStream, &TapeBuffer, 1, &CurrentTapeBuffer);
-					break;
-				case SMediumWriteError:
-					pOnStream->GetLastSense(sense);
-					skip = (unsigned int) (unsigned char) sense[9];
-					Debug (2, "WriteError: Device advised to skip %i\n", skip);
-					if (!skip) skip = 80;
-				case STimeoutWaitPos:
-					Debug (2, "WriteError: Try to skip %i frames \n", skip);
-					if ((skip = pOnStream->SkipLocate (skip))) CurrentFrame = skip;
-					else CurrentFrame += RequeueData(pOnStream, &TapeBuffer, 0, &CurrentTapeBuffer, 80);
-					retry = 1;
-					break;
-				case SEndOfMedium:
-					Debug(0, "End of Medium not handled\n");
-					return 1;
-
-				case SPowerOnReset:
-					Debug(2, "Power on reset occurred - Backing up to last known written block (%d)...\n", CurrentFrame - TotalBufferedFrames);
-
-					WaitForReady(pOnStream);
-					pOnStream->DataTransferMode(true);
-					CheckSense(pOnStream);
-					pOnStream->VendorID((char *) VENDORID);
-					if (CheckSense(pOnStream)) {
-						return -1;
-					}
-					if (!FlushBuffer(pOnStream)) {
-						Debug(0, "Can't Flush buffer from drive!\n");
-						return -1;
-					}
-					Debug(2, "Re-seeking to last known written frame...\n");
-					if (false == pOnStream->Locate(CurrentFrame - TotalBufferedFrames)) {
-						Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						exit(-1);
-					}
-					WaitForReady(pOnStream);
-					Debug(2, "Done.\n");
-
-					RequeueData(pOnStream, &TapeBuffer, 0, &CurrentTapeBuffer, 0, true);
-					retry = 1;
-					break;
-				default:
-					Debug(0, "Unhandled sense %d\n", CurrentSense);
-					return -1;
-				}
-				
-
-				pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-
-				Debug(6, "Max buffer = %d Current = %d\n", MaxBuffer, CurrentBuffer);
-
-				if (CurrentFrame == second_cfg) {
-					Debug(2, "Skipping over secondary config area.\n");
-					CurrentFrame = 0xBB8;
-					if (false == pOnStream->Locate(0xBB8, true)) {
-						Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						return 1;
-					}
-					WaitForReady(pOnStream);
-				}
-			}
-
-			if (multiple == 0) {
-				fclose(fFile);
-			}
-			free (readbuf);
-
-			// Write EOD frame
-			AuxFrame.FrameType = 0x0100;
-			// TODO: Write completely valid EOD
-			memset(buf, 0, 33280);
-			FormatAuxFrame(AuxFrame, &buf[32768]);
-			Debug(2, "Writing EOD frame.\n");
-			if (false == pOnStream->Write(buf, 33280)) {
-				Debug(0, "main: write failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-				delete pOnStream;
-				return 1;
-			}
-			AddFrameToBuffer(&LastTapeBuffer, buf);
-			CheckWrittenFrames(pOnStream, &TapeBuffer, 1, &CurrentTapeBuffer);
-			if (CheckSense(pOnStream)) {
-				return -1;
-			}
-
-			WaitForWrite(pOnStream, &TapeBuffer, &CurrentTapeBuffer);
-
-			pOnStream->ShowPosition(NULL, NULL);
-			WaitForReady(pOnStream);
-			pOnStream->ShowPosition(NULL, NULL);
-			if (multiple && !signalled) {
-				Debug(2, "Rewinding and Ejecting...");
-				if (false == pOnStream->LURewindAndEject()) {
-					Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-					delete pOnStream;
-					return 1;
-				}
-
-				WaitForReady(pOnStream, true);
-				Debug(2, "Done.\n");
-			} else 	if (rewind) {
-				Debug(2, "Rewinding...");
-				if (false == pOnStream->Rewind()) {
-					Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-					delete pOnStream;
-					return 1;
-				}
-
-				WaitForReady(pOnStream);
-				Debug(2, "Done.\n");
-			}
-			Debug(2, "%Ld bytes in %ld seconds (%Ld bytes/sec %0.3f kbytes/sec %0.3f Mbytes/sec)\n", totalBytes, time(NULL) - startTime, totalBytes / (int) (time(NULL) - startTime), totalBytes / (float) (time(NULL) - startTime) / 1024.0, totalBytes / (float) (time(NULL) - startTime) / 1048576.0);
-			if (signalled) raise (signalled);
-#if 0
-			Debug(2, "Waiting for more data...\n");
-			
-			do {
-				int nTestChar;
-
-				clearerr(fFile);
-				usleep(250);
-
-				nTestChar = fgetc(fFile);
-
-				if (EOF != nTestChar) {
-					ungetc(nTestChar, fFile);
-					break;
-				}
-			} while (!signalled);
-
-			Debug(0, "Waiting for more data...\n");
-#endif
-
-		} else { /* read mode */
-			Debug(2, "Moving to start of user data. Frame = %d\n", StartFrame);
-			if (false == pOnStream->Locate(StartFrame)) {
-				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-				delete pOnStream;
-				return 1;
-			}
-
-			CurrentFrame = StartFrame;
-
-			WaitForReady(pOnStream);
-
-			Debug(2, "Starting read\n");
-
 			if (false == pOnStream->StartRead()) {
 				Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 				delete pOnStream;
 				return 1;
 			}
 			WaitForReady(pOnStream);
-
-			if (NULL != filename) {
-				if (NULL == (fil = fopen(filename, "w"))) {
-					Debug(0, "Can't open file %s for writing - Error %s\n", filename, strerror(errno));
-					return 1;
-				}
-			} else {
-				fil = stdout;
+			continue;
+		case SEOD:
+			Debug(2, "Sense: End-of-data at frame %ld. Advancing 5 frames...\n", CurrentFrame);
+			if (false == pOnStream->Locate(CurrentFrame += 5)) {
+				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+				delete pOnStream;
+				return 1;
 			}
-			
-			startTime = time(NULL);
-			CurrentSeqNo = 0;
-
-			while (!eof && !signalled) {
-				if (OS_NEED_POLL(pOnStream->FWRev()))
-					CurrentSense = pOnStream->WaitPosition (CurrentFrame);
-				else
-					CurrentSense = SNoSense;
-				if (CurrentSense == SNoSense) {
-					if (false == pOnStream->Read(buf)) {
-						Debug(0, "main: Read 0 failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						return 1;
-					}
-					CurrentSense = CheckSense(pOnStream);
-				}
-				switch (CurrentSense) {
-				case SNoSense:
-					break;
-				case SUnrecoveredReadError:
-				case STimeoutWaitPos:
-					// See if the next readable frame has our data in it.
-					Debug(2, "Unrecoverable read error at frame %ld. Checking next block...\n", CurrentFrame);
-					if (retry++ > 5) {
-						eof = 1;
-						continue;
-					}
-					if (CurrentSense == SUnrecoveredReadError) CurrentFrame++;
-					else CurrentFrame += 40;
-					if (false == pOnStream->Locate(CurrentFrame)) {
-						Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						return 1;
-					}
-					if (false == pOnStream->StartRead()) {
-						Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						return 1;
-					}
-					WaitForReady(pOnStream);
-					continue;
-				case SEOD:
-					Debug(2, "Sense: End-of-data at frame %ld. Advancing 5 frames...\n", CurrentFrame);
-					if (false == pOnStream->Locate(CurrentFrame += 5)) {
-						Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						return 1;
-					}
-					WaitForReady(pOnStream);
-					if (false == pOnStream->StartRead()) {
-						Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-						delete pOnStream;
-						return 1;
-					}
-					WaitForReady(pOnStream);
-					continue;
-				default:
-					Debug(0, "Unhandled sense %d\n", CurrentSense);
-					return -1;
-				}
-				CurrentFrame++;
-				unFormatAuxFrame(&buf[32768], &AuxFrame);
-				switch (AuxFrame.FrameType) {
-				case 0x8000:
-					// Data frame
-
-					memcpy(ApplicationSig, &AuxFrame.ApplicationSig, 4);
-					if (debug > 5) {
-						Debug(6, "Read Seq no: %ld\n", AuxFrame.FrameSequenceNumber);
-						ApplicationSig[4] = '\0';
-						Debug(6, "Application Sig: %s (0x%08x)\n", ApplicationSig, (unsigned int) *ApplicationSig);
-					}
-					if (AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements != 1) {
-						Debug(0, "More than 1 logical elements in the block. Only writing first one. (%d)\n", AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements);
-					}
-					if (AuxFrame.PartitionDescription.WritePassCounter != WritePass) {
-						Debug(2, "Old frame found in stream. Skipping...\n");
-						continue;
-					}
-					if (CurrentSeqNo == 0 && StartFrameSet) {
-						CurrentSeqNo = AuxFrame.FrameSequenceNumber;
-					}
-					if (AuxFrame.FrameSequenceNumber < CurrentSeqNo) {
-						Debug(2, "Frame with low sequence number %ld. Expecting %ld. Skipping...\n", AuxFrame.FrameSequenceNumber, CurrentSeqNo);
-						continue;
-					}
-					/* The skip 80 forward could have been too far ... */
-					if (AuxFrame.FrameSequenceNumber > CurrentSeqNo) {
-						Debug(0, "Frame with high sequence number %ld. Expecting %ld. ", AuxFrame.FrameSequenceNumber, CurrentSeqNo);
-						if (retry++ > 5) {
-							eof = 1;
-							Debug (0, "Aborting\n");
-							break;
-						}
-						CurrentFrame -= AuxFrame.FrameSequenceNumber - CurrentSeqNo + 1;
-						Debug (0, "Jump Back to %i.\n", CurrentFrame);
-						if (CurrentFrame > second_cfg && CurrentFrame <= second_cfg + 5) {
-							if (adr_version < 10004) CurrentFrame -= 6;
-							else CurrentFrame -= 5;
-						}
-						if (false == pOnStream->Locate(CurrentFrame)) {
-							Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-							delete pOnStream;
-							return 1;
-						}
-						if (false == pOnStream->StartRead()) {
-							Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-							delete pOnStream;
-							return 1;
-						}
-						WaitForReady(pOnStream);
-						continue;
-					}
-
-					CurrentSeqNo++; retry = 0;
-					fwrite(buf, 1, AuxFrame.DataAccessTable.DataAccessTableEntry[0].size, fil);
-					totalBytes += AuxFrame.DataAccessTable.DataAccessTableEntry[0].size;
-					break;
-				case 0x0100:
-					Debug(2, "EOD\n");
-					/* Ignore EOD frames if in error recovery, 
-					 * i.e. locating forward to find next valid frame */
-					if (!retry) eof = 1;
-					break;
-				default:
-					Debug(2, "Unknown frame 0x%04x at pos %d. Skipping.\n", 
-					      AuxFrame.FrameType, CurrentFrame);
-					//fwrite(buf, 1, 33280, DebugFile);
-				}
+			WaitForReady(pOnStream);
+			if (false == pOnStream->StartRead()) {
+				Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+				delete pOnStream;
+				return 1;
 			}
-			//fclose(DebugFile);
-			if (NULL != filename) {
-				fclose(fil);
+			WaitForReady(pOnStream);
+			continue;
+		default:
+			Debug(0, "Unhandled sense %d\n", CurrentSense);
+			return -1;
+		}
+		CurrentFrame++;
+		unFormatAuxFrame(&buf[32768], &AuxFrame);
+		switch (AuxFrame.FrameType) {
+		case 0x8000:
+			// Data frame
+
+			memcpy(ApplicationSig, &AuxFrame.ApplicationSig, 4);
+			if (debug > 5) {
+				Debug(6, "Read Seq no: %ld\n", AuxFrame.FrameSequenceNumber);
+				ApplicationSig[4] = '\0';
+				Debug(6, "Application Sig: %s (0x%08x)\n", ApplicationSig, (unsigned int) *ApplicationSig);
 			}
-			Debug(2, "%Ld bytes in %ld seconds (%f bytes/sec %f kbytes/sec %f Mbytes/sec)\n", totalBytes, time(NULL) - startTime, totalBytes / (float) (time(NULL) - startTime), totalBytes / (float) (time(NULL) - startTime) / 1024.0, totalBytes / (float) (time(NULL) - startTime) / 1048576.0);
-			if (rewind) {
-				Debug(2, "Rewinding...");
-				if (false == pOnStream->Rewind()) {
-					Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+			if (AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements != 1) {
+				Debug(0, "More than 1 logical elements in the block. Only writing first one. (%d)\n", AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements);
+			}
+			if (AuxFrame.PartitionDescription.WritePassCounter != WritePass) {
+				Debug(2, "Old frame found in stream. Skipping...\n");
+				continue;
+			}
+			if (CurrentSeqNo == 0 && StartFrameSet) {
+				CurrentSeqNo = AuxFrame.FrameSequenceNumber;
+			}
+			if (AuxFrame.FrameSequenceNumber < CurrentSeqNo) {
+				Debug(2, "Frame with low sequence number %ld. Expecting %ld. Skipping...\n", AuxFrame.FrameSequenceNumber, CurrentSeqNo);
+				continue;
+			}
+			/* The skip 80 forward could have been too far ... */
+			if (AuxFrame.FrameSequenceNumber > CurrentSeqNo) {
+				Debug(0, "Frame with high sequence number %ld. Expecting %ld. ", AuxFrame.FrameSequenceNumber, CurrentSeqNo);
+				if (retry++ > 5) {
+					eof = 1;
+					Debug (0, "Aborting\n");
+					break;
+				}
+				CurrentFrame -= AuxFrame.FrameSequenceNumber - CurrentSeqNo + 1;
+				Debug (0, "Jump Back to %i.\n", CurrentFrame);
+				if (CurrentFrame > second_cfg && CurrentFrame <= second_cfg + 5) {
+					if (adr_version < 10004) CurrentFrame -= 6;
+					else CurrentFrame -= 5;
+				}
+				if (false == pOnStream->Locate(CurrentFrame)) {
+					Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 					delete pOnStream;
 					return 1;
 				}
-
+				if (false == pOnStream->StartRead()) {
+					Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+					delete pOnStream;
+					return 1;
+				}
 				WaitForReady(pOnStream);
-				Debug(2, "Done.\n");
+				continue;
 			}
-			return 0;
 
+			CurrentSeqNo++; retry = 0;
+			fwrite(buf, 1, AuxFrame.DataAccessTable.DataAccessTableEntry[0].size, fil);
+			totalBytes += AuxFrame.DataAccessTable.DataAccessTableEntry[0].size;
+			break;
+		case 0x0100:
+			Debug(2, "EOD\n");
+			/* Ignore EOD frames if in error recovery, 
+			 * i.e. locating forward to find next valid frame */
+			if (!retry) eof = 1;
+			break;
+		default:
+			Debug(2, "Unknown frame 0x%04x at pos %d. Skipping.\n", 
+			      AuxFrame.FrameType, CurrentFrame);
 		}
-
-	} while (multiple == 1 && !signalled);
+	}
+	if (NULL != filename) {
+		fclose(fil);
+	}
+	Debug(2, "%Ld bytes in %ld seconds (%f bytes/sec %f kbytes/sec %f Mbytes/sec)\n", totalBytes, time(NULL) - startTime, totalBytes / (float) (time(NULL) - startTime), totalBytes / (float) (time(NULL) - startTime) / 1024.0, totalBytes / (float) (time(NULL) - startTime) / 1048576.0);
 
 	delete pOnStream;
 	return 0;
