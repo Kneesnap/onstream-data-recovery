@@ -159,7 +159,7 @@ const ssize_t cbSGHeader = sizeof(sg_header);
 //***********************************************
 // Global Variables
 //***********************************************
-int debug = 0;
+int debug = 7;
 FILE* fDebugFile = NULL;
 volatile int signalled = 0;
 unsigned int TotalBufferedFrames = 0;
@@ -1174,6 +1174,14 @@ enum Sense OnStream::WaitPosition (unsigned int CurrentFrame, int timeout, int a
 
 void OnStream::DumpSCSIResult(sg_header* pSG, UINT8* pBuffer) 
 {
+	bool shouldDisplay = false;
+	for (int i = 0; !shouldDisplay && i < 16; i++)
+		if (pSG->sense_buffer[i])
+			shouldDisplay = true;
+	
+	if (false == shouldDisplay)
+		return; // No response, don't bother displaying.
+	
 	Debug(0, "pack_len:      %d\n",   pSG->pack_len);
 	Debug(0, "pack_id:       %d\n",   pSG->pack_id);
 	Debug(0, "result:        %02x\n", pSG->result);
@@ -1193,7 +1201,11 @@ struct TAPE_PARAMETERS GetTapeParameters(OnStream* pOnStream)
 	unsigned char buf[22];
 	struct TAPE_PARAMETERS tp;
 
-	pOnStream->GetTapeParameters(buf);
+	if (false == pOnStream->GetTapeParameters(buf)) {
+		Debug(0, "GetTapeParameters: GetTapeParameters failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+		delete pOnStream;
+		exit(1);
+	}
 
 	tp.Density = buf[6];
 	tp.SegTrk = (buf[10] << 8) + buf[11];
@@ -1483,21 +1495,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	WaitForReady(pOnStream);
-	
-	if (rewind) {
-		Debug(2, "Rewinding...");
-		if (false == pOnStream->Rewind()) {
-			Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			delete pOnStream;
-			return 1;
-		}
-
-		WaitForReady(pOnStream);
-		Debug(2, "Done.\n");
-		return 0;
-	}
-	
+	WaitForReady(pOnStream);	
 		
 	// Do not call LOAD, because we are assuming hotswap!.
 
@@ -1525,12 +1523,27 @@ int main(int argc, char* argv[])
 	CurrentTapeBuffer = CurrentBuffer;
 
 	WaitForReady(pOnStream);
+	if (rewind) {
+		Debug(2, "Rewinding...");
+		if (false == pOnStream->Rewind()) {
+			Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+			delete pOnStream;
+			return 1;
+		}
+
+		WaitForReady(pOnStream);
+		Debug(2, "Done.\n");
+		return 0;
+	}
 
 	if (StartFrameSet && false == pOnStream->Locate(StartFrame)) {
 		Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 		delete pOnStream;
 		return 1;
 	}
+	
+	WaitForReady(pOnStream);
+	pOnStream->ShowPosition(NULL, NULL);
 
 	CurrentFrame = StartFrame;
 	WaitForReady(pOnStream);
@@ -1545,14 +1558,13 @@ int main(int argc, char* argv[])
 	WaitForReady(pOnStream);
 	
 	if (false == StartFrameSet) {
-		if (false == pOnStream->ReadPosition()) {
-			Debug(0, "Failed to ReadPosition()"
+		if (false == pOnStream->ShowPosition(&CurrentFrame, NULL)) {
+			Debug(0, "Failed to ShowPosition() to get the current position. Error %s\n", szOnStreamErrors[pOnStream->GetLastError()]);
 			delete pOnStream;
 			return 1;
 		}
 		
-		CurrentFrame = ntohl (*((UINT32*) &pResultBuffer[4]));
-		Debug(0, "The current tape position has been read as %d, but this may be wrong!\n", CurrentFrame
+		Debug(0, "The current tape position has been read as %d, but this may be wrong!\n", CurrentFrame);
 	}
 
 	if (NULL != filename) {
