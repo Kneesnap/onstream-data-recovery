@@ -159,7 +159,7 @@ const ssize_t cbSGHeader = sizeof(sg_header);
 //***********************************************
 // Global Variables
 //***********************************************
-int debug = 7;
+int debug = 6;
 FILE* fDebugFile = NULL;
 volatile int signalled = 0;
 unsigned int TotalBufferedFrames = 0;
@@ -302,7 +302,7 @@ public:
 
 	bool TestUnitReady(void);
 
-	bool ShowPosition(unsigned int *, unsigned int *);
+	bool ShowPosition(UINT32*, UINT32*);
 
 
 	UINT8 SenseKey(void);
@@ -1106,7 +1106,7 @@ bool OnStream::SCSICommand(const int nSec, const int nUsec)
 		return false;
 	}
 */
-	if (debug > 6)
+	if (debug >= 6)
 		DumpSCSIResult(pSG, &pTempBuffer[cbSGHeader]);
 
 	if (cbResultBuffer > 0)
@@ -1123,7 +1123,7 @@ bool OnStream::SCSICommand(const int nSec, const int nUsec)
 	return true;
 }
 
-bool OnStream::ShowPosition(unsigned int *host, unsigned int *tape) 
+bool OnStream::ShowPosition(UINT32 *host, UINT32 *tape) 
 {
 	if (!ReadPosition())
 		return false;
