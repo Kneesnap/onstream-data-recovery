@@ -1,3 +1,4 @@
+![OnStream Logo](/pictures/onstream-logo.gif)
 # The OnStream Data Recovery Project  
 OnStream tapes saw use primarily as a backup storage medium during the early 2000s mostly in Europe due to their affordability.  
 Unfortunately, OnStream ceased operations due to bankruptcy in 2003 and never had the longevity that other tapes had.  
@@ -12,9 +13,9 @@ I am available to help with OnStream data recovery for the current time, my cont
 The guide has been broken into several sections:  
  1) [Introduction](/info/INTRO.MD)
  2) [What drive do you need?](/info/DRIVES.MD)
- 3a) Is your drive retrying infinitely (More than 5 times)? [The complications of a spliced tape](/info/SPLICES.MD)
- 3b) [How do you get your data?](/info/SOFTWARE.MD)
- 4) [Troubleshooting](/info/TROUBLESHOOTING.MD)
+ 3) Is your drive stuck retrying forever? [The complications of a spliced tape](/info/SPLICES.MD)
+ 4) [How do you get your data?](/info/SOFTWARE.MD)
+ 5) [Troubleshooting](/info/TROUBLESHOOTING.MD)
 
 ### General FAQ/Notes  
  - How does this jumper block thing work? Don't worry too much about it. Most of the SCSI PCI cards out there have an automatic termination setting enabled by default in the BIOS settings, and if you're not connecting any other SCSI devices, then it doesn't matter what ID is set.  
