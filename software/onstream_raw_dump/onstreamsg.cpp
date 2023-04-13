@@ -159,7 +159,7 @@ const ssize_t cbSGHeader = sizeof(sg_header);
 //***********************************************
 // Global Variables
 //***********************************************
-int debug = 6;
+int debug = 5;
 FILE* fDebugFile = NULL;
 volatile int signalled = 0;
 unsigned int TotalBufferedFrames = 0;
@@ -1381,6 +1381,8 @@ int main(int argc, char* argv[])
 	unsigned int CurrentTapeBuffer;
 	unsigned int mode = 2;
 	unsigned int eof = 0;
+	unsigned int EndOfDataIncrement = 100;
+	int StopAtBlock = -1;
 	unsigned int FormatUnderstood = 0;
 	UINT32 CurrentFrame;
 	UINT32 TotalFrames;
@@ -1407,28 +1409,30 @@ int main(int argc, char* argv[])
 	short SCSIDeviceNo = -1;
 	int help = 0;
 	char deviceName[32];
-	int rewind = 0;
 	int multiple = 0;
 
 	opterr = 0; // Supress errors from getops
-	while ((option = getopt(argc, argv, "rd::f:l:s:n:")) != EOF) {
+	while ((option = getopt(argc, argv, "d::f:l:s:n:i:e:")) != EOF) {
 		switch (option) {
 		case 'd':
 			if ((debug = atoi(optarg)) == 0) {
 				debug = 1;
 			}
 			break;
-		case 'r':
-			rewind = 1;
-			break;
 		case 'l':
 			logfilename = strdup(optarg);
+			break;
+		case 'i':
+			EndOfDataIncrement = atoi(optarg);
 			break;
 		case 'f':
 			filename = strdup(optarg);
 			break;
 		case 'n':
 			SCSIDeviceNo = atoi(optarg);
+			break;
+		case 'e':
+			StopAtBlock = atoi(optarg);
 			break;
 		case 's':
 			StartFrameSet = true;
@@ -1439,13 +1443,14 @@ int main(int argc, char* argv[])
 
 	if (help || SCSIDeviceNo == -1) {
 		fprintf(stderr, "%s: SCSI Generic OnStream Tape interface. Written by Terry Hardie.\nVersion %s\n", argv[0], VERSION);
-		fprintf(stderr, "usage: %s -n device_num [-d [level]] [-o filename] [-s block]\n", argv[0]);
+		fprintf(stderr, "usage: %s -n device_num [-d [level]] [-f filename] [-s block] [-e block] [-i increment]\n", argv[0]);
 		fprintf(stderr, "       -n device No SCSI device number of OnStream drive **\n");
 		fprintf(stderr, "       -d [level]   set debug mode to level\n");
 		fprintf(stderr, "       -l filename  write debugging output to named file\n");
 		fprintf(stderr, "       -f filename  Use named file for data output\n");
-		fprintf(stderr, "       -r           Rewind tape (and do nothing else)\n");
 		fprintf(stderr, "       -s block     start reading from this block, instead of current position\n");
+		fprintf(stderr, "       -e block     stop reading upon reaching this block. Does not read the specified block.\n");
+		fprintf(stderr, "       -i increment The amount of blocks to skip when reaching End of Data (EOD)\n");
 		fprintf(stderr, "\n");
 		fprintf(stderr, "** This is not the SCSI ID number, but rather which numbered device in\n");
 		fprintf(stderr, "   the bus this device is. For Eaxmple, if you have a hard drive at ID 2,\n");
@@ -1523,18 +1528,6 @@ int main(int argc, char* argv[])
 	CurrentTapeBuffer = CurrentBuffer;
 
 	WaitForReady(pOnStream);
-	if (rewind) {
-		Debug(2, "Rewinding...");
-		if (false == pOnStream->Rewind()) {
-			Debug(0, "main: Rewind failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			delete pOnStream;
-			return 1;
-		}
-
-		WaitForReady(pOnStream);
-		Debug(2, "Done.\n");
-		return 0;
-	}
 
 	if (StartFrameSet && false == pOnStream->Locate(StartFrame)) {
 		Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
@@ -1579,14 +1572,14 @@ int main(int argc, char* argv[])
 	startTime = time(NULL);
 	CurrentSeqNo = 0;
 
-	while (!eof && !signalled) {
+	while (!eof && !signalled && (StopAtBlock < 0 || StopAtBlock > CurrentFrame)) {
 		if (OS_NEED_POLL(pOnStream->FWRev()))
 			CurrentSense = pOnStream->WaitPosition (CurrentFrame);
 		else
 			CurrentSense = SNoSense;
 		if (CurrentSense == SNoSense) {
 			if (false == pOnStream->Read(buf)) {
-				Debug(0, "main: Read 0 failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+				Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 				delete pOnStream;
 				return 1;
 			}
@@ -1599,7 +1592,7 @@ int main(int argc, char* argv[])
 		case STimeoutWaitPos:
 			// See if the next readable frame has our data in it.
 			Debug(2, "Unrecoverable read error at frame %ld. Checking next block...\n", CurrentFrame);
-			if (retry++ > 5) {
+			if (++retry >= 10) { // 10 is specified in the specification pdf.
 				eof = 1;
 				continue;
 			}
@@ -1618,8 +1611,8 @@ int main(int argc, char* argv[])
 			WaitForReady(pOnStream);
 			continue;
 		case SEOD:
-			Debug(2, "Sense: End-of-data at frame %ld. Advancing 5 frames...\n", CurrentFrame);
-			if (false == pOnStream->Locate(CurrentFrame += 5)) {
+			Debug(2, "Sense: End-of-data at frame %ld. Advancing %d frames...\n", CurrentFrame, EndOfDataIncrement);
+			if (false == pOnStream->Locate(CurrentFrame += EndOfDataIncrement)) {
 				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 				delete pOnStream;
 				return 1;
@@ -1636,72 +1629,14 @@ int main(int argc, char* argv[])
 			Debug(0, "Unhandled sense %d\n", CurrentSense);
 			return -1;
 		}
-		CurrentFrame++;
+		
 		unFormatAuxFrame(&buf[32768], &AuxFrame);
-		switch (AuxFrame.FrameType) {
-		case 0x8000:
-			// Data frame
-
-			memcpy(ApplicationSig, &AuxFrame.ApplicationSig, 4);
-			if (debug > 5) {
-				Debug(6, "Read Seq no: %ld\n", AuxFrame.FrameSequenceNumber);
-				ApplicationSig[4] = '\0';
-				Debug(6, "Application Sig: %s (0x%08x)\n", ApplicationSig, (unsigned int) *ApplicationSig);
-			}
-			if (AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements != 1) {
-				Debug(0, "More than 1 logical elements in the block. Only writing first one. (%d)\n", AuxFrame.DataAccessTable.DataAccessTableEntry[0].LogicalElements);
-			}
-			if (AuxFrame.PartitionDescription.WritePassCounter != WritePass) {
-				Debug(2, "Old frame found in stream. Skipping...\n");
-				continue;
-			}
-			if (CurrentSeqNo == 0) {
-				CurrentSeqNo = AuxFrame.FrameSequenceNumber;
-			}
-			if (AuxFrame.FrameSequenceNumber < CurrentSeqNo) {
-				Debug(2, "Frame with low sequence number %ld. Expecting %ld. Skipping...\n", AuxFrame.FrameSequenceNumber, CurrentSeqNo);
-				continue;
-			}
-			/* The skip 80 forward could have been too far ... */
-			if (AuxFrame.FrameSequenceNumber > CurrentSeqNo) {
-				Debug(0, "Frame with high sequence number %ld. Expecting %ld. ", AuxFrame.FrameSequenceNumber, CurrentSeqNo);
-				if (retry++ > 5) {
-					eof = 1;
-					Debug (0, "Aborting\n");
-					break;
-				}
-				CurrentFrame -= AuxFrame.FrameSequenceNumber - CurrentSeqNo + 1;
-				Debug (0, "Jump Back to %i.\n", CurrentFrame);
-				if (false == pOnStream->Locate(CurrentFrame)) {
-					Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-					delete pOnStream;
-					return 1;
-				}
-				if (false == pOnStream->StartRead()) {
-					Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-					delete pOnStream;
-					return 1;
-				}
-				WaitForReady(pOnStream);
-				continue;
-			}
-
-			CurrentSeqNo++; retry = 0;
-			fwrite(buf, 1, AuxFrame.DataAccessTable.DataAccessTableEntry[0].size, fil);
-			totalBytes += AuxFrame.DataAccessTable.DataAccessTableEntry[0].size;
-			break;
-		case 0x0100:
-			Debug(2, "EOD\n");
-			/* Ignore EOD frames if in error recovery, 
-			 * i.e. locating forward to find next valid frame */
-			if (!retry) eof = 1;
-			break;
-		default:
-			Debug(2, "Unknown frame 0x%04x at pos %d. Reading anyways...\n", 
-			      AuxFrame.FrameType, CurrentFrame);
-			fwrite(buf, 1, 33280, fil);
-			totalBytes += 33280;
-		}
+		Debug(2, "Read block id 0x%04x at pos %d. (Written to file at 0x%x)\n", 
+			  AuxFrame.FrameType, CurrentFrame, totalBytes);
+		retry = 0;
+		fwrite(buf, 1, 33280, fil);
+		totalBytes += 33280;
+		CurrentFrame++;
 	}
 	if (NULL != filename) {
 		fclose(fil);
