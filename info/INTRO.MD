@@ -4,7 +4,7 @@ This should serve as a warning, because learning from my mistakes will prevent y
 This took place over the span of months, and many details and side-tangents have been omitted for clarity.  
 
 ## My Story
-I received a tape containing the "end of project" development for Frogger 2: Swampy's Revenge, my favorite childhood franchise.  
+I received a tape containing the "end of project" development for Frogger 2: Swampy's Revenge, part of my favorite childhood franchise.  
 This tape is believed to be the only backup of the final game source code, game assets, and other development data.  
 As one could imagine, this is priceless to recover. Unfortunately, the first hurdle was finding a tape drive.  
 
@@ -51,9 +51,7 @@ That's insane, and I'm still upset that they told me they could even recover the
 The only option at this point is to hack the drive. It took months to determine that this was the only option, but it truly is.  
 
 **Part 5) The Resolution**  
-I did eventually recover everything which was still possible to recover, but it took months.  
+I did eventually recover everything which was still possible to recover, but it took months of work.  
 Ultimately, it only was possible because I'm an software engineer and already experienced with reverse engineering data formats, assembly code, and got help from electrical engineers who helped with the hardware side of things.  
-The details of how data was dumped despite the splices is part of the guide [here](/info/SPLICES.MD), but it's pretty complicated.  
-  
-  
-My takeaway is just to be careful, and if you're in charge of backups, you need a redundant backup strategy.  
+My hope is to share this information so that it might help someone else, and let those who are less experienced recover data too.  
+The details of how data was dumped despite the splices is part of the guide [here](/info/SPLICES.MD), but it gets pretty complicated.  
