@@ -298,6 +298,7 @@ public:
 	bool Rewind(void);
 	bool LURewind(void);
 	bool LULoad(void);
+	bool LURetention(void);
 	bool IsOnstream(void);
 
 	bool TestUnitReady(void);
@@ -977,6 +978,21 @@ bool OnStream::LULoad(void)
 	return SCSICommand();
 }
 
+bool OnStream::LURetention(void) 
+{
+	NeedCommandBytes(6);
+	NeedResultBytes(0);
+
+	pCommandBuffer[0] = 0x1B; // LOAD/UNLOAD
+	pCommandBuffer[1] = 0x01; // 7-1: reserved; 0: Immed
+	pCommandBuffer[2] = 0x00; // reserved
+	pCommandBuffer[3] = 0x00; // reserved
+	pCommandBuffer[4] = 0x02; // 7-3: reserved; 2: LoEj; 1: Re-Ten; 0: Load
+	pCommandBuffer[5] = 0x00; // reserved
+
+	return SCSICommand();
+}
+
 bool OnStream::TestUnitReady(void) 
 {
 	NeedCommandBytes(6);
@@ -1375,25 +1391,15 @@ int main(int argc, char* argv[])
 	OnStream* pOnStream;
 	Sense CurrentSense;
 	unsigned char buf[33280];
-	struct TAPEBUFFER *LastTapeBuffer = NULL;
 	unsigned long long totalBytes = 0;
-	int rc = 0;
-	unsigned int CurrentTapeBuffer;
-	unsigned int mode = 2;
 	unsigned int eof = 0;
 	unsigned int EndOfDataIncrement = 100;
 	int StopAtBlock = -1;
-	unsigned int FormatUnderstood = 0;
 	UINT32 CurrentFrame;
 	UINT32 TotalFrames;
 	unsigned int MaxBuffer, CurrentBuffer;
-	unsigned int WritePass;
-	unsigned long int CurrentSeqNo;
 	unsigned long long capacity;
-	unsigned int format = 0;
 	unsigned int retry = 0;
-	/* The ADR version: 1000*major + 2*minor */
- 	unsigned int adr_version;
 	/* StartFrame and second_cfg were different in old versions */
 	unsigned int StartFrame = 0;
 	bool StartFrameSet = false;
@@ -1401,23 +1407,24 @@ int main(int argc, char* argv[])
 	time_t startTime;
 	struct TAPE_PARAMETERS tp;
 	struct AUX_FRAME AuxFrame;
-	char ApplicationSig[5];
 	char *filename = NULL;
 	char *logfilename = NULL;
 	FILE *fil;
 	FILE *fFile = stdin;
 	short SCSIDeviceNo = -1;
-	int help = 0;
 	char deviceName[32];
-	int multiple = 0;
+	int retention = 0;
 
 	opterr = 0; // Supress errors from getops
-	while ((option = getopt(argc, argv, "d::f:l:s:n:i:e:")) != EOF) {
+	while ((option = getopt(argc, argv, "td::f:l:s:n:i:e:")) != EOF) {
 		switch (option) {
 		case 'd':
 			if ((debug = atoi(optarg)) == 0) {
 				debug = 1;
 			}
+			break;
+		case 't':
+			retention = 1;
 			break;
 		case 'l':
 			logfilename = strdup(optarg);
@@ -1441,7 +1448,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (help || SCSIDeviceNo == -1) {
+	if (SCSIDeviceNo == -1) {
 		fprintf(stderr, "%s: SCSI Generic OnStream Tape interface. Written by Terry Hardie.\nVersion %s\n", argv[0], VERSION);
 		fprintf(stderr, "usage: %s -n device_num [-d [level]] [-f filename] [-s block] [-e block] [-i increment]\n", argv[0]);
 		fprintf(stderr, "       -n device No SCSI device number of OnStream drive **\n");
@@ -1449,6 +1456,7 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "       -l filename  write debugging output to named file\n");
 		fprintf(stderr, "       -f filename  Use named file for data output\n");
 		fprintf(stderr, "       -s block     start reading from this block, instead of current position\n");
+		fprintf(stderr, "       -t           apply equal tension throughout tape, reducing likelihood of read errors\n");
 		fprintf(stderr, "       -e block     stop reading upon reaching this block. Does not read the specified block.\n");
 		fprintf(stderr, "       -i increment The amount of blocks to skip when reaching End of Data (EOD)\n");
 		fprintf(stderr, "\n");
@@ -1501,9 +1509,15 @@ int main(int argc, char* argv[])
 	}
 
 	WaitForReady(pOnStream);	
+	
+	if (retention) {
+		Debug(1, "Retentioning - This may take some time...");
+		pOnStream->LURetention();
+		WaitForReady(pOnStream);
+		Debug(1, "Done.\n");
+	}
 		
-	// Do not call LOAD, because we are assuming hotswap!.
-
+	// Do not call LOAD, because we are allowing hotswapping tapes for data recovery!
 	pOnStream->DataTransferMode(true);
 	CheckSense(pOnStream);
 
@@ -1514,10 +1528,10 @@ int main(int argc, char* argv[])
 	tp = GetTapeParameters(pOnStream);
 	CheckSense(pOnStream);
 		
-	if (tp.SegTrk == 19239 && tp.Trks == 24) {
+	if (tp.SegTrk == 19239 && tp.Trks == 24) { // 30 GB Tapes
 		TotalFrames = tp.SegTrk * tp.Trks;
 		capacity = (long long) (TotalFrames) * 32768;
-	} else {
+	} else { // 50GB tapes.
 		TotalFrames = (tp.SegTrk - 99) * tp.Trks;
 		capacity = (long long) (TotalFrames) * 32768;
 	}
@@ -1525,7 +1539,6 @@ int main(int argc, char* argv[])
 	Debug(2, "Capacity: ");
 	Debug(2, "%Ld bytes\n", capacity);
 	pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-	CurrentTapeBuffer = CurrentBuffer;
 
 	WaitForReady(pOnStream);
 
@@ -1570,7 +1583,6 @@ int main(int argc, char* argv[])
 	}
 		
 	startTime = time(NULL);
-	CurrentSeqNo = 0;
 
 	while (!eof && !signalled && (StopAtBlock < 0 || StopAtBlock > CurrentFrame)) {
 		if (OS_NEED_POLL(pOnStream->FWRev()))

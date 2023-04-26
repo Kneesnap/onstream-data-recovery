@@ -17,6 +17,9 @@ The guide has been broken into several sections:
  4) [How do you get your data?](/info/SOFTWARE.MD)
  5) [Troubleshooting](/info/TROUBLESHOOTING.MD)
 
+Unfortunately, the guide can only go so far. I've done my best to document everything, but the guide is just a starting point.  
+I've done my best to include as many tools, documentation, and information as possible throughout this repository, and hopefully the guide can give proper context.  
+
 ### General FAQ/Notes  
  - How does this jumper block thing work? Don't worry too much about it. Most of the SCSI PCI cards out there have an automatic termination setting enabled by default in the BIOS settings, and if you're not connecting any other SCSI devices, then it doesn't matter what ID is set.  
  - It is possible to use a 68pin to 50pin SCSI converter for the SCSI-2 based devices, but only if the converter properly terminates the 8-bit portion of the bus. Any competent adapter should do this automatically.  
