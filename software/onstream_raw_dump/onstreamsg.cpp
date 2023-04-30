@@ -292,6 +292,8 @@ public:
 	bool ReadPosition(void);
 	enum Sense WaitPosition(unsigned int, int to = 30, int ahead = 0);
 	bool Locate(UINT32 nLogicalBlock, bool write = false);
+	bool LocatePhysical(UINT32 yPos, UINT16 xPos);
+	bool LocatePhysical(UINT32 physicalBlock);
 	UINT32 SkipLocate(UINT32 skip);
 	bool Flush(void);
 	void Drain(void);
@@ -881,6 +883,38 @@ bool OnStream::Locate(UINT32 nLogicalBlock, bool write)
 	return SCSICommand();
 }
 
+bool OnStream::LocatePhysical(UINT32 yPos, UINT16 xPos)
+{	
+	NeedCommandBytes(10);
+	NeedResultBytes(0);
+
+	pCommandBuffer[0] = 0x2B; // LOCATE
+	pCommandBuffer[1] = 0x05; // 7-3: reserved; 2: BT; 1: 1; 0: Immed
+	pCommandBuffer[2] = yPos; // reserved
+	pCommandBuffer[3] = 0x00; // reserved
+	cpAndSwap(&pCommandBuffer[4], &xPos, 2); // logical block position
+	pCommandBuffer[7] = 0x00; // reserved;
+	pCommandBuffer[8] = 0x00; // reserved;
+	pCommandBuffer[9] = 0x00; // 7: SKIP; 6-0: reserved
+
+	return SCSICommand();
+}
+
+bool OnStream::LocatePhysical(UINT32 physicalBlock)
+{
+	NeedCommandBytes(10);
+	NeedResultBytes(0);
+
+	pCommandBuffer[0] = 0x2B; // LOCATE
+	pCommandBuffer[1] = 0x05; // 7-3: reserved; 2: BT; 1: 1; 0: Immed
+	cpAndSwap(&pCommandBuffer[2], &physicalBlock, 4); // logical block position
+	pCommandBuffer[7] = 0x00; // reserved;
+	pCommandBuffer[8] = 0x00; // reserved;
+	pCommandBuffer[9] = 0x00; // 7: SKIP; 6-0: reserved
+
+	return SCSICommand();
+}
+
 /* This is the new (1.06) way of recovering write errors */
 UINT32 OnStream::SkipLocate(UINT32 skip) 
 {
@@ -1414,9 +1448,10 @@ int main(int argc, char* argv[])
 	short SCSIDeviceNo = -1;
 	char deviceName[32];
 	int retention = 0;
+	int PhysicalAddressMode = 0;
 
 	opterr = 0; // Supress errors from getops
-	while ((option = getopt(argc, argv, "td::f:l:s:n:i:e:")) != EOF) {
+	while ((option = getopt(argc, argv, "tdp::f:l:s:n:i:e:")) != EOF) {
 		switch (option) {
 		case 'd':
 			if ((debug = atoi(optarg)) == 0) {
@@ -1428,6 +1463,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'l':
 			logfilename = strdup(optarg);
+			break;
+		case 'p':
+			PhysicalAddressMode = true;
 			break;
 		case 'i':
 			EndOfDataIncrement = atoi(optarg);
@@ -1443,18 +1481,23 @@ int main(int argc, char* argv[])
 			break;
 		case 's':
 			StartFrameSet = true;
-			StartFrame = atoi(optarg);
+			if (PhysicalAddressMode) {
+				StartFrame = strtoul(optarg, NULL, 16);
+			} else {
+				StartFrame = atoi(optarg);
+			}
 			break;
 		}
 	}
 
 	if (SCSIDeviceNo == -1) {
-		fprintf(stderr, "%s: SCSI Generic OnStream Tape interface. Written by Terry Hardie.\nVersion %s\n", argv[0], VERSION);
-		fprintf(stderr, "usage: %s -n device_num [-d [level]] [-f filename] [-s block] [-e block] [-i increment]\n", argv[0]);
+		fprintf(stderr, "%s: SCSI Generic OnStream Tape interface. Written by Terry Hardie, upgraded by Kneesnap\nVersion %s\n", argv[0], VERSION);
+		fprintf(stderr, "usage: %s -n <device_num> [-d [level]] [-f filename] [-p] [-s block] [-e block] [-i increment]\n", argv[0]);
 		fprintf(stderr, "       -n device No SCSI device number of OnStream drive **\n");
 		fprintf(stderr, "       -d [level]   set debug mode to level\n");
 		fprintf(stderr, "       -l filename  write debugging output to named file\n");
 		fprintf(stderr, "       -f filename  Use named file for data output\n");
+		fprintf(stderr, "       -p           Use physical addressing format (Can be used to dump the parking zone) ***\n");
 		fprintf(stderr, "       -s block     start reading from this block, instead of current position\n");
 		fprintf(stderr, "       -t           apply equal tension throughout tape, reducing likelihood of read errors\n");
 		fprintf(stderr, "       -e block     stop reading upon reaching this block. Does not read the specified block.\n");
@@ -1464,10 +1507,19 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "   the bus this device is. For Eaxmple, if you have a hard drive at ID 2,\n");
 		fprintf(stderr, "   and your OnStream drive at ID 5, then this value should be 1 (0 is the\n");
 		fprintf(stderr, "   hard drive\n");
-		fprintf(stderr, "***In this mode, when EOF is read from the input file, the tape is closed,\n");
-		fprintf(stderr, "   rewound, and the file is then waited on for more data. When more data\n");
-		fprintf(stderr, "   become avilable, the tape is then written to from the beginning again.\n");
-		fprintf(stderr, "   After reading EOF from the file, the tape should be changed.\n");
+		fprintf(stderr, "***This will change any blocks you specify for as for -s into a hexadecimal number.\n");
+		fprintf(stderr, "***The -e argument will become a count of the number of blocks to read instead of a physical position.\n");
+		fprintf(stderr, "   The first byte represents the vertical tape position of the physical data. 0 <= y <= 23\n");
+		fprintf(stderr, "   The final two form a 16-bit number representing the horizonal tape position. 0 <= x < 31959\n");
+		fprintf(stderr, "   Example: 05000120, Y = 0x05 (5), X = 0x120 (288)\n");
+		fprintf(stderr, "   \n");
+		fprintf(stderr, "   Because these positions map directly onto a physical portion of tape, and cover the\n");
+		fprintf(stderr, "   entire tape, they can be used to read from inaccessible parts, such as the \"parking zone\".\n");
+		fprintf(stderr, "   The parking zone is a portion of the tape which the drive leaves the tape in when ejected,\n");
+		fprintf(stderr, "   and it is NOT supposed to have any data written there. However, some software such as \n");
+		fprintf(stderr, "   ARCserve writes data there, so we need to support dumping it.\n");
+		fprintf(stderr, "   NOTE: It is believed only the 50GB tapes have this parking zone.\n");
+		fprintf(stderr, "   \n");
 		exit(-1);
 	}
 
@@ -1542,10 +1594,16 @@ int main(int argc, char* argv[])
 
 	WaitForReady(pOnStream);
 
-	if (StartFrameSet && false == pOnStream->Locate(StartFrame)) {
-		Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
-		delete pOnStream;
-		return 1;
+	if (StartFrameSet) {
+		if (false == pOnStream->LocatePhysical(StartFrame)) {
+			Debug(0, "main: LocatePhysical failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+			delete pOnStream;
+			return 1;
+		} else if (false == pOnStream->Locate(StartFrame)) {
+			Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+			delete pOnStream;
+			return 1;
+		}
 	}
 	
 	WaitForReady(pOnStream);
@@ -1584,7 +1642,7 @@ int main(int argc, char* argv[])
 		
 	startTime = time(NULL);
 
-	while (!eof && !signalled && (StopAtBlock < 0 || StopAtBlock > CurrentFrame)) {
+	while (!eof && !signalled && (StopAtBlock < 0 || (PhysicalAddressMode ? StopAtBlock-- : StopAtBlock > CurrentFrame))) {
 		if (OS_NEED_POLL(pOnStream->FWRev()))
 			CurrentSense = pOnStream->WaitPosition (CurrentFrame);
 		else
@@ -1623,6 +1681,12 @@ int main(int argc, char* argv[])
 			WaitForReady(pOnStream);
 			continue;
 		case SEOD:
+			if (PhysicalAddressMode) {
+				Debug(2, "Sense: End-of-data at frame %ld. Exiting due to physical addressing mode...\n", CurrentFrame);
+				eof = 1;
+				continue;
+			}
+			
 			Debug(2, "Sense: End-of-data at frame %ld. Advancing %d frames...\n", CurrentFrame, EndOfDataIncrement);
 			if (false == pOnStream->Locate(CurrentFrame += EndOfDataIncrement)) {
 				Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
