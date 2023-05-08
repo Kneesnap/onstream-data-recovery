@@ -18,5 +18,5 @@ Credit to aluigi for QuickBMS.
 ARCserve shipped broken data recovery software which couldn't even recover the data it wrote. In fact, the software would report "Restoration Success" despite from a 10GB backup, the folder it restored to only having a couple megabytes worth of data in it.
 It would find and create all of the files, but they would only contain a few kilobytes of their actual data.  
 On top of this, ARCserve is using undocumented hardware features of the SC-50 tape drive in order to write data in a different order than the drive is specified by documentation to use.  
-If that wasn't bad enough, it's also writing data to a portion of the tape called the "parking zone", which the [tape drive's documentation](/archive/documents/ADR Driver Development Specifications 1.3.pdf) doesn't provide any way to read/write from.  
+If that wasn't bad enough, it's also writing data to a portion of the tape called the "parking zone", which the [the tape drive's documentation](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf) doesn't provide any way to read/write from.  
 I had to reverse engineer the drive firmware and ARCserve to figure this out. This is wholly unacceptable for **backup software**, which was advertised as being able to recover damaged backups.  
