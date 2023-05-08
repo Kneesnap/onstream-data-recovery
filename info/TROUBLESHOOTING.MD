@@ -56,3 +56,7 @@ If this doesn't work, the drive is probably broken, but there are physical ways 
 This issue seems to go away when I try a different PC motherboard.  
 Not a clue what's wrong with the first motherboard, but this motherboard has many strange quirks such as sometimes not displaying the SCSI PCI card boot screen.  
 So perhaps motherboards can cause weird issues like this one.  
+
+### Drive issues "Power On / Device Reset" status when reading, or randomly resets with a tape inserted.
+This issue seemed related to the last issue. Try using another motherboard, SCSI cable, and PCI/SCSI adapter. Make sure SCSI is properly terminated.  
+It can get pretty finnicky sometimes but I've found trying different things and trying many reboots seems to yield good results.  
