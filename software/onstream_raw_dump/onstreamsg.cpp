@@ -1643,6 +1643,16 @@ int main(int argc, char* argv[])
 	startTime = time(NULL);
 
 	while (!eof && !signalled && (StopAtBlock < 0 || (PhysicalAddressMode ? StopAtBlock-- : StopAtBlock > CurrentFrame))) {
+		// I have a problem with the SC-50 drive (or more likely my PCI to SCSI adapter), where after a while it has a problem.
+		// It sends a "Power On / Device Reset" signal while in the "data phase", usually right after issuing read commands.
+		// Because the drive can do other operations just fine generally like rewinding, retensioning, seeking, etc, I figured data transfer speed was seemingly the problem.
+		// Eg: It would be erratic, sometimes it would reset after one read command, for others it would be a hundred or two.
+		// I restricted the transfer speed in my card's BIOS settings, but the thing which seemed to do the trick was sleeping between reads.
+		// This delay might be good to change if you can't get the program to work, but this drastically improved the reliability of the driver for me once this issue started happening.
+		// It seems swapping PCI cards and motherboard helps too, but only as a short-term fix.
+		// This does not appear to slow down the reading speed by much, if at all.
+		usleep(50);
+		
 		if (OS_NEED_POLL(pOnStream->FWRev()))
 			CurrentSense = pOnStream->WaitPosition (CurrentFrame);
 		else
@@ -1682,7 +1692,7 @@ int main(int argc, char* argv[])
 			continue;
 		case SEOD:
 			if (PhysicalAddressMode) {
-				Debug(2, "Sense: End-of-data at frame %ld. Exiting due to physical addressing mode...\n", CurrentFrame);
+				Debug(2, "Sense: End-of-data at frame %ld. Exiting due to physical addressing mode with %d block(s) left...\n", CurrentFrame, StopAtBlock);
 				eof = 1;
 				continue;
 			}
