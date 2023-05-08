@@ -79,7 +79,7 @@ It actually turns out the original ARCserve software wouldn't have been capable 
 In short, the software which wrote the data had to be reverse engineered to understand the format in which it wrote data, its compression format, and of course the annoying discoveries such as how it uses an undocumented indexing mode for tape positions or how it writes data to a spot on the tape described as "not being possible to write data to".  
 I will omit the details of this and save them for the technical writeup in the onstream data recovery repository.  
 The main takeaway is that a custom driver had to be made and software had to be written to parse the recovered data and turn it into a zip file, and it got complicated.  
-Source code and binaries are included (here)[/software/arcserve-file-extractor/].  
+Source code is included [here](/software/arcserve-file-extractor/).  
 
 ### 6) The Resolution  
 In the end, the recovery was an unquestionable success. Of the approximately 8GB of data written on the tape, just under 7.5GB was recovered.
