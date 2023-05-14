@@ -288,7 +288,8 @@ public:
 	void GetLastSense(void *sense);
 	bool BufferStatus(unsigned int *max, unsigned int *current);
 	bool VendorID(char ID[4]);
-	bool DataTransferMode(bool Aux);
+	bool DataTransferMode(bool Aux, bool streamingMode);
+	bool SetTurnAroundBoundary(UINT16 segmentsPerTrack, UINT16 trackCount);
 	bool ReadPosition(void);
 	enum Sense WaitPosition(unsigned int, int to = 30, int ahead = 0);
 	bool Locate(UINT32 nLogicalBlock, bool write = false);
@@ -818,7 +819,7 @@ bool OnStream::VendorID(char ID[4])
 	return SCSICommand();
 }
 
-bool OnStream::DataTransferMode(bool Aux) 
+bool OnStream::DataTransferMode(bool Aux, bool streamingMode) 
 {
 	NeedCommandBytes(18);
 	NeedResultBytes(0);
@@ -837,9 +838,46 @@ bool OnStream::DataTransferMode(bool Aux)
 	pCommandBuffer[11] = 0x02; // ??
 	pCommandBuffer[12] = 0x00; // reserved
 	if (Aux)
-		pCommandBuffer[13] = 0xA2; // 7: Streaming mode 6: reserved 5: 32.5k record 4: 32k record 3-2: reserved 1: 32.5k playback 0: 32k playback
+		pCommandBuffer[13] = 0x22; // 7: Streaming mode 6: reserved 5: 32.5k record 4: 32k record 3-2: reserved 1: 32.5k playback 0: 32k playback
 	else
-		pCommandBuffer[13] = 0x91; // 7: Streaming mode 6: reserved 5: 32.5k record 4: 32k record 3-2: reserved 1: 32.5k playback 0: 32k playback
+		pCommandBuffer[13] = 0x11; // 7: Streaming mode 6: reserved 5: 32.5k record 4: 32k record 3-2: reserved 1: 32.5k playback 0: 32k playback
+	
+	if (streamingMode)
+		pCommandBuffer[13] |= 0x80;
+
+	return SCSICommand();
+}
+
+// This is an undocumented command, but it was found in ARCserve's tapeeng.dll.
+// It allows for a different read/write pattern than what is supposed to be used.
+// But, since it was used, we need it. 
+bool OnStream::SetTurnAroundBoundary(UINT16 segmentsPerTrack, UINT16 trackCount)
+{
+	NeedCommandBytes(26);
+	NeedResultBytes(0);
+
+	pCommandBuffer[0] = 0x15; // MODE SELECT
+	pCommandBuffer[1] = 0x10; // 7-5: reserved 4: PF 3-1: Reserved 0: SP
+	pCommandBuffer[2] = 0x00; // reserved
+	pCommandBuffer[3] = 0x00; // length (MSB)
+	pCommandBuffer[4] = 0x10; // Length 8 bytes of mode data
+	pCommandBuffer[5] = 0x00; // reserved
+	pCommandBuffer[6] = 0x0F; // Mode data length
+	pCommandBuffer[7] = 0x00; // Medium type ??
+	pCommandBuffer[8] = 0x00; // reserved
+	pCommandBuffer[9] = 0x00; // block descriptor length
+	pCommandBuffer[10] = 0xB2; // 7: PS 6: reserved 5-0: Page code (30 Data Transfer Mode)
+	pCommandBuffer[11] = 0x10;
+	pCommandBuffer[12] = (trackCount - 1) & 0xFF;
+	pCommandBuffer[13] = 0x00;
+	pCommandBuffer[14] = ((segmentsPerTrack - 1) >> 8) & 0xFF;
+	pCommandBuffer[15] = (segmentsPerTrack - 1) & 0xFF;
+	pCommandBuffer[16] = 0x00;
+	pCommandBuffer[17] = 0x00;
+	pCommandBuffer[18] = 0x00;
+	pCommandBuffer[19] = 0x00;
+	pCommandBuffer[20] = 0x00;
+	pCommandBuffer[21] = 0x00;
 
 	return SCSICommand();
 }
@@ -1569,15 +1607,8 @@ int main(int argc, char* argv[])
 		WaitForReady(pOnStream);
 		Debug(1, "Done.\n");
 	}
-		
-	// Do not call LOAD, because we are allowing hotswapping tapes for data recovery!
-	pOnStream->DataTransferMode(true);
-	CheckSense(pOnStream);
-
-	// A locate should clear all buffers, but we're designing this with hotswaps in mind so...
-	pOnStream->Drain();
-	WaitForReady(pOnStream);
 	
+	// Get tape parameters.
 	tp = GetTapeParameters(pOnStream);
 	CheckSense(pOnStream);
 		
@@ -1591,8 +1622,41 @@ int main(int argc, char* argv[])
 	Debug(2, "Density: %d\nSegTrk: %d\nTrks: %d\n", tp.Density, tp.SegTrk, tp.Trks);
 	Debug(2, "Capacity: ");
 	Debug(2, "%Ld bytes\n", capacity);
+	WaitForReady(pOnStream);
+	
+	if (PhysicalAddressMode) {
+		// In physical addressing mode, we want the software to read in the pattern which ARCserve reads.
+		// Normally, at a boundary (usually 1500 blocks since the last one), the drive will automatically move to another track group and read in the opposite direction.
+		// In other words, it keeps reading the same piece of tape over and over but at a different physical height on the tape.
+		// ARCserve has been observed to use undocumented features in order to skip this and read in a straight line until the physical end of tape is reached, which is when it'll change track and move in opposite direction.
+		// It is unknown if any other software use this functionality.
+		// ARCserver has thus been reverse engineered to support these undocumented features, because it not only makes preserving tapes written with ARCserve easier, but it also can be easier to use when dumping problem spots on broken tapes because it makes for much easier visualization of what parts of the tape are broken.
+		// The solution is to use undocumented OnStream drive features which I reverse engineered the protocol of by looking at Arcserve's tapeeng.dll.
+		
+		pOnStream->DataTransferMode(true, false);
+		CheckSense(pOnStream);
+		WaitForReady(pOnStream);
+		
+		if (false == pOnStream->SetTurnAroundBoundary(tp.SegTrk, tp.Trks)) {
+			Debug(0, "main: SetTurnAroundBoundary failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
+			delete pOnStream;
+			return 1;
+		}
+		
+		CheckSense(pOnStream);
+		WaitForReady(pOnStream);
+	} else {
+		// Initialize the drive normally, with streaming mode enabled.
+		pOnStream->DataTransferMode(true, true);
+		CheckSense(pOnStream);
+	}
+	
+	// A locate should clear all buffers, but we may not always do that...
+	pOnStream->Drain();
+	WaitForReady(pOnStream);
+	
+	// Query drive position.
 	pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
-
 	WaitForReady(pOnStream);
 
 	if (StartFrameSet) {
@@ -1635,6 +1699,7 @@ int main(int argc, char* argv[])
 	if (NULL != filename) {
 		if (NULL == (fil = fopen(filename, "w"))) {
 			Debug(0, "Can't open file %s for writing - Error %s\n", filename, strerror(errno));
+			delete pOnStream;
 			return 1;
 		}
 	} else {
@@ -1714,6 +1779,7 @@ int main(int argc, char* argv[])
 			continue;
 		default:
 			Debug(0, "Unhandled sense %d\n", CurrentSense);
+			delete pOnStream;
 			return -1;
 		}
 		
