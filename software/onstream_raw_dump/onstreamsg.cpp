@@ -306,7 +306,7 @@ public:
 
 	bool TestUnitReady(void);
 
-	bool ShowPosition(UINT32*, UINT32*);
+	bool GetPosition(UINT32*, UINT32*, bool);
 
 
 	UINT8 SenseKey(void);
@@ -1212,7 +1212,7 @@ bool OnStream::SCSICommand(const int nSec, const int nUsec)
 	return true;
 }
 
-bool OnStream::ShowPosition(UINT32 *host, UINT32 *tape) 
+bool OnStream::GetPosition(UINT32 *host, UINT32 *tape, bool show) 
 {
 	if (!ReadPosition())
 		return false;
@@ -1223,15 +1223,19 @@ bool OnStream::ShowPosition(UINT32 *host, UINT32 *tape)
 		else
 			Debug(3, "EOP\n");
 	}
-	Debug(3, "First Frame postion to/from host: %d\n", ntohl(*((UINT32*) &pResultBuffer[4])));
+	
+	if (show)
+		Debug(3, "First Frame postion to/from host: %d\n", ntohl(*((UINT32*) &pResultBuffer[4])));
 	if (host != NULL)
 		*host = ntohl(*((UINT32*) &pResultBuffer[4]));
-
-	Debug(3, "Last Frame postion to/from tape: %d\n", ntohl(*((UINT32*) &pResultBuffer[8])));
+	
+	if (show)
+		Debug(3, "Last Frame postion to/from tape: %d\n", ntohl(*((UINT32*) &pResultBuffer[8])));
 	if (tape != NULL)
 		*tape = ntohl(*((UINT32*) &pResultBuffer[8]));
-
-	Debug(3, "Blocks in tape buffer: %d\n", *((UINT8*) &pResultBuffer[15]));
+	
+	if (show)
+		Debug(3, "Blocks in tape buffer: %d\n", *((UINT8*) &pResultBuffer[15]));
 	return true;
 }
 		
@@ -1659,7 +1663,9 @@ int main(int argc, char* argv[])
 	pOnStream->BufferStatus(&MaxBuffer, &CurrentBuffer);
 	WaitForReady(pOnStream);
 
+
 	if (StartFrameSet) {
+		CurrentFrame = StartFrame;
 		if (PhysicalAddressMode && false == pOnStream->LocatePhysical(StartFrame)) {
 			Debug(0, "main: LocatePhysical failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 			delete pOnStream;
@@ -1672,9 +1678,13 @@ int main(int argc, char* argv[])
 	}
 	
 	WaitForReady(pOnStream);
-	pOnStream->ShowPosition(NULL, NULL);
-
-	CurrentFrame = StartFrame;
+	
+	// Get current position.
+	if (false == pOnStream->GetPosition(&CurrentFrame, NULL, true)) {
+		Debug(0, "Failed to GetPosition() to get the current position. Error %s\n", szOnStreamErrors[pOnStream->GetLastError()]);
+		delete pOnStream;
+		return 1;
+	}
 	WaitForReady(pOnStream);
 
 	Debug(2, "Starting read\n");
@@ -1685,16 +1695,6 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	WaitForReady(pOnStream);
-	
-	if (false == StartFrameSet) {
-		if (false == pOnStream->ShowPosition(&CurrentFrame, NULL)) {
-			Debug(0, "Failed to ShowPosition() to get the current position. Error %s\n", szOnStreamErrors[pOnStream->GetLastError()]);
-			delete pOnStream;
-			return 1;
-		}
-		
-		Debug(0, "The current tape position has been read as %d, but this may be wrong!\n", CurrentFrame);
-	}
 
 	if (NULL != filename) {
 		if (NULL == (fil = fopen(filename, "w"))) {
@@ -1724,6 +1724,7 @@ int main(int argc, char* argv[])
 		else
 			CurrentSense = SNoSense;
 		if (CurrentSense == SNoSense) {
+			pOnStream->GetPosition(&CurrentFrame, NULL, false); // TODO: Don't display.
 			if (false == pOnStream->Read(buf)) {
 				Debug(0, "main: Read failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 				delete pOnStream;
