@@ -392,6 +392,7 @@ void unFormatAuxFrame(unsigned char* FAuxFrame, struct AUX_FRAME *AuxFrame) {
 		return;
 
 	memcpy(&AuxFrame->ApplicationSig, &FAuxFrame[4], 4);
+	cpAndSwap(&AuxFrame->HwField, &FAuxFrame[8], 4);
 	cpAndSwap(&AuxFrame->UpdateFrameCounter, &FAuxFrame[12], 4);
 	cpAndSwap(&AuxFrame->FrameType, &FAuxFrame[16], 2);
 	AuxFrame->PartitionDescription.PartitionNumber = FAuxFrame[20];
@@ -1595,11 +1596,11 @@ int main(int argc, char* argv[])
 	WaitForReady(pOnStream);
 
 	if (StartFrameSet) {
-		if (false == pOnStream->LocatePhysical(StartFrame)) {
+		if (PhysicalAddressMode && false == pOnStream->LocatePhysical(StartFrame)) {
 			Debug(0, "main: LocatePhysical failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 			delete pOnStream;
 			return 1;
-		} else if (false == pOnStream->Locate(StartFrame)) {
+		} else if (!PhysicalAddressMode && false == pOnStream->Locate(StartFrame)) {
 			Debug(0, "main: Locate failed: '%s'\n", szOnStreamErrors[pOnStream->GetLastError()]);
 			delete pOnStream;
 			return 1;
@@ -1717,8 +1718,13 @@ int main(int argc, char* argv[])
 		}
 		
 		unFormatAuxFrame(&buf[32768], &AuxFrame);
-		Debug(2, "Read block id 0x%04x at pos %d. (Written to file at 0x%x)\n", 
-			  AuxFrame.FrameType, CurrentFrame, totalBytes);
+		if (PhysicalAddressMode) {
+			Debug(2, "Read block id 0x%04x/%.4s at pos %08X. (Written to file at 0x%x)\n", 
+				AuxFrame.FrameType, &AuxFrame.ApplicationSig, AuxFrame.HwField, totalBytes);
+		} else {
+			Debug(2, "Read block id 0x%04x/%.4s at pos %d. (Written to file at 0x%x)\n", 
+				AuxFrame.FrameType, &AuxFrame.ApplicationSig, CurrentFrame, totalBytes);
+		}
 		retry = 0;
 		fwrite(buf, 1, 33280, fil);
 		totalBytes += 33280;
