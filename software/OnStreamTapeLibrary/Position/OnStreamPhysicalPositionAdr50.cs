@@ -66,11 +66,11 @@ namespace OnStreamTapeLibrary.Position
         public override bool IsRepresentableAsLogicalBlock => !this.IsParkingZone;
         
         /// <inheritdoc cref="OnStreamPhysicalPosition.IsBeforeParkingZone"/>
-        public override bool IsBeforeParkingZone => (this.Location == OnStreamTapeAddressableLocation.FrontHalf);
+        public override bool IsBeforeParkingZone => (this.Location == OnStreamTapeAddressableLocation.BackHalf);
         /// <inheritdoc cref="OnStreamPhysicalPosition.IsParkingZone"/>
         public override bool IsParkingZone => (this.Location == OnStreamTapeAddressableLocation.ParkingZone);
         /// <inheritdoc cref="OnStreamPhysicalPosition.IsAfterParkingZone"/>
-        public override bool IsAfterParkingZone => (this.Location == OnStreamTapeAddressableLocation.BackHalf);
+        public override bool IsAfterParkingZone => (this.Location == OnStreamTapeAddressableLocation.FrontHalf);
 
         public const int ParkingZoneFrameCount = 99;
         public const int FramesPerTrack = 31959;

@@ -1,7 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
-using ModToolFramework.Utils.DataStructures;
+using OnStreamTapeLibrary;
+using OnStreamTapeLibrary.Workers;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -12,24 +13,6 @@ using System.Text;
 
 namespace OnStreamSCArcServeExtractor
 {
-    /// <summary>
-    /// Uniquely identifies a 32Kb block of data from a tape dump.
-    /// </summary>
-    public class OnStreamTapeBlock
-    {
-        public readonly TapeDumpFile File;
-        public readonly long Index; // Index of the block within the file it was found in.
-        public readonly uint PhysicalBlock;
-        public uint LogicalBlock => OnStreamPhysicalPosition.ConvertPhysicalBlockToLogical(this.PhysicalBlock);
-        public string LogicalBlockString => OnStreamPhysicalPosition.ConvertPhysicalBlockToLogicalString(this.PhysicalBlock);
-
-        public OnStreamTapeBlock(TapeDumpFile file, long index, uint physicalBlock) {
-            this.File = file;
-            this.Index = index;
-            this.PhysicalBlock = physicalBlock;
-        }
-    }
-
     internal class FileError
     {
         /// <summary>
@@ -85,11 +68,11 @@ namespace OnStreamSCArcServeExtractor
     internal class TapeDumpData
     {
         public readonly List<FileError> Errors = new List<FileError>();
-        public readonly TapeConfig Config;
+        public readonly TapeDefinition Config;
         public readonly ZipArchive Archive;
         public string? CurrentBasePath;
 
-        public TapeDumpData(TapeConfig config, ZipArchive archive) {
+        public TapeDumpData(TapeDefinition config, ZipArchive archive) {
             this.Config = config;
             this.Archive = archive;
         }
@@ -104,82 +87,26 @@ namespace OnStreamSCArcServeExtractor
         /// Extracts files from the tape dumps configured with <see cref="tape"/>.
         /// </summary>
         /// <param name="tape">The configuration for the tape dump file(s).</param>
-        public static void ExtractFilesFromTapeDumps(TapeConfig tape) {
+        public static void ExtractFilesFromTapeDumps(TapeDefinition tape) {
             // Setup logger.
             string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + " Extraction.log");
             using FileLogger logger = new FileLogger(logFilePath, true);
 
             ExtractFilesFromTapeDumps(tape, logger);
         }
-
-        private static Dictionary<uint, OnStreamTapeBlock> GenerateBlockMapping(TapeConfig tape, ILogger logger) {
-            Dictionary<uint, OnStreamTapeBlock> blockMap = new Dictionary<uint, OnStreamTapeBlock>();
-
-            logger.LogInformation("Scanning tape chunks to map out their contents...");
-            foreach (TapeDumpFile entry in tape.Entries) {
-                logger.LogInformation($"Scanning '{entry.GetFileName("dump")}'...");
-
-                uint logicalPosition = (uint)(entry.BlockIndex ?? 0);
-                using DataReader reader = new DataReader(entry.RawStream, true);
-                reader.JumpTemp(0);
-                while (reader.HasMore) {
-                    // If there's an error, skip the logical position.
-                    while (entry.Errors.Contains(logicalPosition))
-                        logicalPosition++;
-                    
-                    // Read data.
-                    long fileIndex = reader.Index;
-                    long fileIndexWithoutAux = OnStreamDataStream.RemoveAuxSectionsFromIndex(fileIndex);
-                    reader.Index += OnStreamDataStream.DataSectionSize + (1 * DataConstants.IntegerSize);
-                    if (!reader.HasMore)
-                        continue; // For some reason we have a bad frogger dump that wants this.
-
-                    uint marker = reader.ReadUInt32(ByteEndian.BigEndian);
-                    uint physicalPosition = reader.ReadUInt32(ByteEndian.BigEndian);
-                    reader.Index += OnStreamDataStream.AuxSectionSize - (3 * DataConstants.IntegerSize);
-
-                    if (marker == 0x57545354) { // 'WTST' aka "Write Stop" -> ArcServe has this data after the end as a marker that the data is done.
-                        // If we have any of this, we can safely ignore it.
-                        logicalPosition++;
-                        continue;
-                    }
-
-                    // Determine position:
-                    if (physicalPosition != 0 && physicalPosition != 0xFFFFFFFFU) { // This happened with one of the frogger 2 dumps.
-                        // Do nothing, we're good.
-                    } else if (entry.HasBlockIndex) {
-                        logger.LogWarning($" - {reader.GetFileIndexDisplay(fileIndex)} in {entry.FileName} reported an invalid physical position. We've calculated it to be {logicalPosition} instead.");
-                        physicalPosition = OnStreamPhysicalPosition.ConvertLogicalBlockToPhysical(logicalPosition);
-                    } else {
-                        logger.LogWarning($" - {reader.GetFileIndexDisplay(fileIndex)} in {entry.FileName} reported an invalid physical position. We could not calculate it because this is a parking zone.");
-                        logicalPosition++;
-                        continue;
-                    }
-
-                    // Track the block.
-                    blockMap[physicalPosition] = new OnStreamTapeBlock(entry, fileIndexWithoutAux, physicalPosition);
-                    logicalPosition++;
-                }
-
-                reader.JumpReturn();
-            }
-
-            logger.LogInformation($"Scan complete, mapped {blockMap.Count} blocks.");
-            return blockMap;
-        }
-
+        
         /// <summary>
         /// Extracts files from the tape dumps configured with <see cref="tape"/>.
         /// </summary>
         /// <param name="tape">The configuration for the tape dump file(s).</param>
         /// <param name="logger">The logger to write output to.</param>
-        public static void ExtractFilesFromTapeDumps(TapeConfig tape, ILogger logger) {
+        public static void ExtractFilesFromTapeDumps(TapeDefinition tape, ILogger logger) {
             // Generate mapping:
-            Dictionary<uint, OnStreamTapeBlock> blockMapping = GenerateBlockMapping(tape, logger);
-            FindAndLogGaps(blockMapping, logger);
+            Dictionary<uint, OnStreamTapeBlock> blockMapping = OnStreamBlockMapping.GetBlockMapping(tape, logger);
+            OnStreamGapFinder.FindAndLogGaps(tape.Type, blockMapping, logger);
             
             // Show the tape image.
-            Image image = TapeImageCreator.CreateImage(blockMapping);
+            Image image = TapeImageCreator.CreateImage(tape.Type, blockMapping);
             image.Save(Path.Combine(tape.FolderPath, "tape-damage.png"), ImageFormat.Png);
 
             // Setup zip file.
@@ -189,7 +116,7 @@ namespace OnStreamSCArcServeExtractor
             using ZipArchive archive = ZipFile.Open(zipFilePath, ZipArchiveMode.Create, Encoding.UTF8);
 
             // Setup reader
-            using DataReader reader = new DataReader(new OnStreamInterwovenStream(tape, blockMapping));
+            using DataReader reader = new DataReader(new OnStreamInterwovenStream(tape.CreatePhysicallyOrderedBlockList(blockMapping)));
             TapeDumpData tapeData = new TapeDumpData(tape, archive);
 
             // Start reading all the files.
@@ -202,6 +129,10 @@ namespace OnStreamSCArcServeExtractor
                 } catch (Exception ex) {
                     logger.LogError(ex.ToString());
                     logger.LogError($"Encountered an error while reading the data at {reader.GetFileIndexDisplay(preReadIndex)}.");
+                }
+
+                if (reader.WasMissingDataSkipped(preReadIndex, true, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock)) {
+                    logger.LogError($"Skipped {blocksSkipped} tape missing tape block(s) from after {lastValidBlock.PhysicalBlock:X8}/{lastValidBlock.LogicalBlockString}.");
                 }
 
                 reader.Align(ArcServe.RootSectorSize);
@@ -338,78 +269,6 @@ namespace OnStreamSCArcServeExtractor
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// Find and log gaps in the tape data layout.
-        /// </summary>
-        /// <param name="blockMapping">The mapping of blocks.</param>
-        /// <param name="logger">The logger to log with.</param>
-        private static void FindAndLogGaps(Dictionary<uint, OnStreamTapeBlock> blockMapping, ILogger logger) {
-            BitArray array = new BitArray(OnStreamPhysicalPosition.FramesPerTrack * OnStreamPhysicalPosition.TrackCount);
-            foreach (uint physicalPosition in blockMapping.Keys) {
-                OnStreamPhysicalPosition.FromPhysicalBlock(physicalPosition, out OnStreamPhysicalPosition tempPos);
-                int tempValue = (tempPos.Track * OnStreamPhysicalPosition.FramesPerTrack) + tempPos.X;
-                array.Set(tempValue, true);
-            }
-
-            OnStreamPhysicalPosition.FromLogicalBlock(0, out OnStreamPhysicalPosition currentPos); // Tape origin. Includes the parking zone.
-            List<TapeEmptyGap> gaps = new List<TapeEmptyGap>();
-            
-            int gapSize = 0;
-            OnStreamPhysicalPosition firstOpenPhysPos = currentPos;
-            do {
-                int arrayIndex = (currentPos.Track * OnStreamPhysicalPosition.FramesPerTrack) + currentPos.X;
-                if (!array.Get(arrayIndex)) {
-                    if (gapSize++ == 0)
-                        firstOpenPhysPos = currentPos;
-                    continue;
-                }
-
-                if (gapSize > 0) {
-                    gaps.Add(new TapeEmptyGap(in firstOpenPhysPos, in currentPos, gapSize));
-                    gapSize = 0;
-                }
-            } while (ArcServe.TryIncrementBlockIncludeParkingZone(in currentPos, out currentPos));
-            
-            // Sort first by X position, then by track.
-            // The purpose of this is to organize data located physically together, so when using this as a list of data to dump,
-            //  it will organize the data together to reduce the amount of seeking required
-            // And also when I dump data based on this list it's nice to have this data together because it
-            //  allows me to avoid seeking constantly by organizing all the data in a certain area
-            gaps.Sort(Comparer<TapeEmptyGap>.Create((a, b) => {
-                var res= a.StartPos.X.CompareTo(b.StartPos.X);
-                return res != 0 ? res : a.StartPos.Track.CompareTo(b.StartPos.Track);
-            }));
-            
-            if (gapSize > 0) // Add this after the sorting, so this shows up last.
-                gaps.Add(new TapeEmptyGap(in firstOpenPhysPos, in currentPos, gapSize));
-
-            if (gaps.Count > 0) {
-                logger.LogInformation("Missing Data Ranges (No data is here, it could be damaged, or maybe there's just no data written there):");
-
-                // Display the gaps.
-                foreach (TapeEmptyGap gap in gaps) 
-                    logger.LogInformation($" - Gap Position: {gap.StartPos.ToPhysicalBlock():X8} -> {gap.EndPos.ToPhysicalBlock():X8}, Logical Blocks: {gap.StartPos.ToLogicalBlockString()} -> {gap.EndPos.ToLogicalBlockString()}, Gap Size (Blocks): {gap.BlockCount}");
-
-                logger.LogInformation("");
-            }
-        }
-        
-        /// <summary>
-        /// Represents a gap in the data which was provided to the program.
-        /// </summary>
-        private class TapeEmptyGap
-        {
-            public readonly OnStreamPhysicalPosition StartPos;
-            public readonly OnStreamPhysicalPosition EndPos;
-            public readonly int BlockCount;
-            
-            public TapeEmptyGap(in OnStreamPhysicalPosition startPos, in OnStreamPhysicalPosition endPos, int blockCount) {
-                this.StartPos = startPos;
-                this.EndPos = endPos;
-                this.BlockCount = blockCount;
-            }
         }
     }
 }

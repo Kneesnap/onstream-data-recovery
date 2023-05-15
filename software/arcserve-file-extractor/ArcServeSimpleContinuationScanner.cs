@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
+using OnStreamTapeLibrary;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +14,7 @@ namespace OnStreamSCArcServeExtractor
     /// </summary>
     public class ArcServeSimpleContinuationScanner
     {
-        public static void ReportFileSections(TapeConfig tape) {
+        public static void ReportFileSections(TapeDefinition tape) {
             string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + " Section Scan.log");
             using FileLogger logger = new FileLogger(logFilePath, true);
 

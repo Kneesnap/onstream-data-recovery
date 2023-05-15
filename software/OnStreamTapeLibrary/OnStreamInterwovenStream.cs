@@ -160,7 +160,7 @@ namespace OnStreamTapeLibrary
                 throw new InvalidCastException($"The reader is attached to {reader.BaseStream.GetTypeDisplayName()}, not an {nameof(OnStreamInterwovenStream)}.");
             return interwovenStream.CurrentBlock;
         }
-
+        
         /// <summary>
         /// Test if the reader skipped any blocks due to them not being present since the given index.
         /// </summary>
@@ -171,17 +171,35 @@ namespace OnStreamTapeLibrary
         /// <returns>Whether any missing data was skipped.</returns>
         /// <exception cref="InvalidCastException">Thrown if the reader is not reading an interwoven stream.</exception>
         public static bool WasMissingDataSkipped(this DataReader reader, long startIndex, bool resumeAfterError, out int blocksSkipped) {
+            return WasMissingDataSkipped(reader, startIndex, resumeAfterError, out blocksSkipped, out _);
+        }
+
+        /// <summary>
+        /// Test if the reader skipped any blocks due to them not being present since the given index.
+        /// </summary>
+        /// <param name="reader">The reader to test.</param>
+        /// <param name="startIndex">The earliest reader position index which an error could be found at.</param>
+        /// <param name="resumeAfterError">If there was an error, and this is true, the reader will start reading at the first position after the error.</param>
+        /// <param name="blocksSkipped">The number of blocks skipped since the provided reader index.</param>
+        /// <param name="lastValidBlock">Output storage for the last valid block.</param>
+        /// <returns>Whether any missing data was skipped.</returns>
+        /// <exception cref="InvalidCastException">Thrown if the reader is not reading an interwoven stream.</exception>
+        public static bool WasMissingDataSkipped(this DataReader reader, long startIndex, bool resumeAfterError, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock) {
             if (reader.BaseStream is not OnStreamInterwovenStream interwovenStream)
                 throw new InvalidCastException($"The reader is attached to {reader.BaseStream.GetTypeDisplayName()}, not an {nameof(OnStreamInterwovenStream)}.");
             if (startIndex > reader.Index)
                 throw new ArgumentOutOfRangeException(nameof(startIndex), $"The provided index {reader.GetFileIndexDisplay(startIndex)} comes after the current reader index, {reader.GetFileIndexDisplay()}.");
 
+            lastValidBlock = reader.GetCurrentTapeBlock();
             int oldBlockPos = (int)(startIndex / OnStreamInterwovenStream.BufferLength);
             int newBlockPos = (int)(startIndex / OnStreamInterwovenStream.BufferLength);
 
             blocksSkipped = 0;
             for (int i = oldBlockPos; i <= newBlockPos; i++) {
                 OnStreamTapeBlock block = interwovenStream.Blocks[i];
+                if (blocksSkipped == 0)
+                    lastValidBlock = block;
+                
                 if (block.MissingBlockCount > 0) {
                     if (blocksSkipped == 0 && resumeAfterError)
                         reader.Index = ((i + 1) * OnStreamDataStream.DataSectionSize);

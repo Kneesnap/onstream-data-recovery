@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
+using OnStreamTapeLibrary;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -46,6 +47,36 @@ namespace OnStreamSCArcServeExtractor
             }
 
             return newFile;
+        }
+
+        /// <summary>
+        /// Find missing files in the zip file created by the tape config.
+        /// </summary>
+        /// <param name="tape">The tape config to find missing files from.</param>
+        /// <param name="logger">The logger to log output to.</param>
+        public static void FindMissingFilesFromTapeZip(TapeDefinition tape, ILogger logger)
+        {
+            string zipFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + ".zip");
+            if (!File.Exists(zipFilePath)) {
+                DirectoryInfo? parentDir = Directory.GetParent(tape.FolderPath);
+
+                if (parentDir != null) {
+                    string parentFilePath = Path.Combine(parentDir.FullName, tape.DisplayName + ".zip");
+                    if (File.Exists(parentFilePath))
+                        zipFilePath = parentFilePath;
+                }
+
+                if (!File.Exists(zipFilePath)) {
+                    logger.LogError($"Expected to find file '{zipFilePath}', but it does not exist!");
+                    return;
+                }
+
+            }
+
+            using FileStream fileStream = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
+            using BufferedStream bufferedStream = new BufferedStream(fileStream);
+            using ZipArchive archive = new ZipArchive(bufferedStream, ZipArchiveMode.Read);
+            ArcServeCatalogueFile.FindMissingFilesFromZipFile(archive, logger);
         }
         
         /// <summary>
@@ -94,16 +125,24 @@ namespace OnStreamSCArcServeExtractor
                 if (lastColon >= 1)
                     folderPath = folderPath[(lastColon - 1)..];
 
-                string searchPath = folderPath + fileEntry.FileName;
-                if (fileEntry.IsDirectory && !searchPath.EndsWith("\\", StringComparison.InvariantCulture))
-                    searchPath += "\\";
+                string windowsSearchPath = (folderPath + fileEntry.FileName).Replace('/', '\\');
+                if (fileEntry.IsDirectory && !windowsSearchPath.EndsWith("\\", StringComparison.InvariantCulture))
+                    windowsSearchPath += "\\";
+                string unixSearchPath = windowsSearchPath.Replace('\\', '/');
 
-                ZipArchiveEntry? zipEntry = archive.GetEntry(searchPath);
+                ZipArchiveEntry? zipEntry = archive.GetEntry(windowsSearchPath);
+                zipEntry ??= archive.GetEntry(unixSearchPath); 
+                if (fileEntry.IsDirectory) {
+                    zipEntry ??= archive.GetEntry(windowsSearchPath[0..^1]);
+                    zipEntry ??= archive.GetEntry(unixSearchPath[0..^1]);
+                }
+
                 if (zipEntry != null && zipEntry.Length != fileEntry.FileSize) {
-                    logger.LogInformation($" Damaged: '{searchPath}', File Length: {fileEntry.FileSize}, Recovered: {zipEntry.Length}");
+                    logger.LogInformation($" Damaged: '{zipEntry.FullName}', File Length: {fileEntry.FileSize}, Recovered: {zipEntry.Length}");
+
                     errorsFound++;
                 } else if (zipEntry == null) {
-                    logger.LogInformation($" Missing: '{searchPath}', File Length: {fileEntry.FileSize}");
+                    logger.LogInformation($" Missing: '{folderPath}{fileEntry.FileName}', File Length: {fileEntry.FileSize}");
                     errorsFound++;
                 } else {
                     matchesFound++;

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
+using OnStreamTapeLibrary;
 using System;
 
 namespace OnStreamSCArcServeExtractor
@@ -14,76 +15,6 @@ namespace OnStreamSCArcServeExtractor
         public const int RootSectorSize = 0x200;
         public const bool FastDebuggingEnabled = false;
         
-        /// <summary>
-        /// Increments an OnStream physical position to the next position which ArcServe would read.
-        /// This may only apply to ArcServe because most software incremented the logical block number like the documentation said to.
-        /// ArcServe instead reads in a straight line until it hits the end of the tape.
-        /// </summary>
-        /// <param name="input">The position to increment.</param>
-        /// <param name="output">Output storage for the new position.</param>
-        /// <returns>If the increment was successful.</returns>
-        public static bool TryIncrementBlockSkipParkingZone(in OnStreamPhysicalPosition input, out OnStreamPhysicalPosition output) {
-            output = input;
-
-            if ((input.Track % 2) == 0) {
-                if (input.X == OnStreamPhysicalPosition.ParkingZoneStart - 1) { // Reached parking zone.
-                    if (input.Track == 0) { // End of tape.
-                        return false;
-                    } else { // Skip parking zone.
-                        output.X = OnStreamPhysicalPosition.ParkingZoneEnd;
-                    }
-                } else if (input.X >= OnStreamPhysicalPosition.FramesPerTrack - 1) { // End of track.
-                    output.Track++;
-                } else {
-                    output.X++;
-                }
-            } else if (input.X == OnStreamPhysicalPosition.ParkingZoneEnd) { // Skip parking zone.
-                output.X = OnStreamPhysicalPosition.ParkingZoneStart - 1;
-            } else if (input.X == 0) { // End of track.
-                if (input.Track == OnStreamPhysicalPosition.TrackCount - 1) { // Last track! This is a guess that the behavior works this way, but it's likely.
-                    output.Track = 0;
-                } else { // Reached beginning of track, let's move tracks.
-                    output.Track++;
-                }
-            } else {
-                output.X--;
-            }
-
-            return true;
-        }
-        
-        /// <summary>
-        /// Increments an OnStream physical position to the next position which ArcServe would read.
-        /// This may only apply to ArcServe because most software incremented the logical block number like the documentation said to.
-        /// ArcServe instead reads in a straight line until it hits the end of the tape.
-        /// </summary>
-        /// <param name="input">The position to increment.</param>
-        /// <param name="output">Output storage for the new position.</param>
-        /// <returns>If the increment was successful.</returns>
-        public static bool TryIncrementBlockIncludeParkingZone(in OnStreamPhysicalPosition input, out OnStreamPhysicalPosition output) {
-            output = input;
-
-            if ((input.Track % 2) == 0) {
-                if (input.X == OnStreamPhysicalPosition.ParkingZoneEnd - 1 && input.Track == 0) { // End of parking zone.
-                    return false;
-                } else if (input.X >= OnStreamPhysicalPosition.FramesPerTrack - 1) { // End of track.
-                    output.Track++;
-                } else {
-                    output.X++;
-                }
-            } else if (input.X == 0) { // End of track.
-                if (input.Track == OnStreamPhysicalPosition.TrackCount - 1) { // Last track! This is a guess that the behavior works this way, but it's likely.
-                    output.Track = 0;
-                } else { // Reached beginning of track, let's move tracks.
-                    output.Track++;
-                }
-            } else {
-                output.X--;
-            }
-
-            return true;
-        }
-
         /// <summary>
         /// Reads an ArcServe session header.
         /// </summary>

@@ -18,6 +18,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\ModToolFramework\ModToolFramework.csproj" />
+        <ProjectReference Include="..\OnStreamTapeLibrary\OnStreamTapeLibrary.csproj" />
     </ItemGroup>
 
     <ItemGroup>
