@@ -72,23 +72,46 @@ But if you asked me at the time, you wouldn't have seen it. I used this as furth
 Months of effort was spent understanding the drive, studying its SCSI command interface, reverse engineering firmware, reading documentation, digging up patents, etc.  
 While much was learned about the drive, the major breakthrough came just after midnight on April 5th 2023 and ended up being significantly simpler than the other attempted methods.  
 If the initialization process is the problem, then what if we were to run the initialization process with a working tape? Then, by tricking the drive sensors we could switch the tape without the drive knowing a swap occurred.  
+Using this trick, all undamaged portions of the tape were dumped successfully.
 
-### 5) Wait there's more?
-Unfortunately, with such complicated restrictions in place, the original ARCServe software.
-It actually turns out the original ARCserve software wouldn't have been capable of reading the data anyways. That is too deep of a rabbit hole to jump into here though.  
-In short, the software which wrote the data had to be reverse engineered to understand the format in which it wrote data, its compression format, and of course the annoying discoveries such as how it uses an undocumented indexing mode for tape positions or how it writes data to a spot on the tape described as "not being possible to write data to".  
-I will omit the details of this and save them for the technical writeup in the onstream data recovery repository.  
-The main takeaway is that a custom driver had to be made and software had to be written to parse the recovered data and turn it into a zip file, and it got complicated.  
-Source code is included [here](/software/arcserve-file-extractor/).  
+### 5a) ARCServe Sucks
+Now that I had the data off the tape, there was still one problem, it wasn't in a usable format.  
+The data which comes off the tape is formatted in whatever way the software which wrote it chose.  
+Unfortunately, that means every single compatible backup software product made their own proprietary format, including ARCserve.  
+This is the challenge of doing a raw dump, if I were able to use the original software, it would automatically give back the data in a usable form.
+Or at least, it would if ARCserve wasn't garbage! It turns out ARCserve is broken. It isn't even capable of reading the OnStream tapes it writes, even when they are not damaged.  
+This issue doesn't affect tapes written with the ADR-50 drive, but all the tapes I have tested written with the OnStream SC-50 do NOT restore from tape unless the PC which wrote the tape is the PC which restores the tape.
+This is because the PC which writes the tape stores a catalog of tape information such as tape file listing locally, which the 
+ARCserve is supposed to be able to restore without the catalog because it's something which only the PC which wrote the backup has, defeating the purpose of a backup.  
+Yet, despite ARCserve showing a popup which says "Restoration Successful", it restores up to the first 32KB of every file on the tape, but NO MORE.  
+For an undamaged several gigabyte tape which takes two hours for ARCserve to read, it will restore about 1MB of data total.  
+
+### 5b) Making it usable
+In order to put bring the files into a usable format (.zip), I had to write a program to convert the tape dumps from the ARCserve format into a .zip.  
+Thankfully, the ARCserve format wasn't very complex and I figured it out pretty quickly.  
+However, there was something strange. An abnormally high amount of files were exporting improperly.  
+After spending some time analyzing data and thinking, it became apparent that ARCserve was using an undocumented mode for reading the tape. 
+This is explained in more depth in [the guide](/info/RAW_DUMP.MD), but ARCServe was using an undocumented feature not documented in the [official OnStream driver development document](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf).  
+This undocumented feature allowed ARCserve to read and write data in a way where it would read/write in a way completely different from how the documentation said to do it.  
+Even after changing my program to read data in the undocumented way ARCserve did it, I still saw errors which I didn't expect to see.  
+This time it didn't take long to see that the missing data was in a position of the tape which [the documentation](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf) explicitly states "no user data can be recorded".  
+So, I modified my tools and the dumping program again to read the area "where no user data can be recorded".  
+Finally, after months of reverse engineering of ARCServe, the drive firmware, and other garbage, the program worked, and the data was saved.  
+Source code for the extraction program is included [here](/software/arcserve-file-extractor/).  
 
 ### 6) The Resolution  
-In the end, the recovery was an unquestionable success. Of the approximately 8GB of data written on the tape, just under 7.5GB was recovered.
-And while a couple thousand files were damaged, they make up less than 5% of the total files on the tape.  
-But, it gets better. All except ONE of the damaged files were either found in another CD backup or were duplicated on another part of the tape.  
-There was only one file in the entire tape which was unrecoverable, a CD image of a PC game build from 1 month after the master PC version had already shipped.  
-Having recovered 58163 out of the 58164 files on the tape, this adventure can only be considered a success.  
+In the end, the recovery was an unquestionable success.
 Thank you everyone who helped with this project, without your help who knows how long it would have taken or if the data would have even been recovered.  
+All the important data such as the VSS repository backup (source code history), final game assets, tools, and more were saved.  
+The tape was the only backup for those things, and it complete's Frogger 2's development archives, which will be released publicly.  
+It might sound bad that approximately 11.5GB of the 15GB written data was recovered, but this is misleading.  
+A couple thousand files were damaged, but they make up less than 5% of the total files on the tape.  
+Nearly all of the damaged files were either found in another CD backup or were duplicated on another part of the tape.  
+There were only 16 files which were not perfectly recovered, and only one was noteworthy, a CD image of a PC game build from 1 month after release.  
+Having recovered 58157 out of the 58164 files on the tape, this adventure can only be considered a success.  
+Here's what the damage looks like to the Frogger 2 tape, showing the significant damage and how lucky the recovery was.  
+![Frogger 2 Tape Damage](/pictures/visual-aids/frogger2-tape-damage.png)
 
 ### 7) Further Technical Details
 The hope is to share all the information we learned so that it might help someone else, and let those who are less experienced recover data too.  
-Further technical information is available as [part of the data dumping guide](/info/SPLICES.MD) in this repository.  
+Further technical details are scattered throughout the repository, and this guide, and I am willing to answer questions.  

@@ -13,9 +13,10 @@ I am available to help with OnStream data recovery for the current time, my cont
 The guide has been broken into several sections:  
  1) [Introduction](/info/INTRO.MD)
  2) [What drive do you need?](/info/DRIVES.MD)
- 3) Is your drive stuck retrying forever? [The complications of a spliced tape](/info/SPLICES.MD)
- 4) [How do you get your data?](/info/SOFTWARE.MD)
- 5) [Troubleshooting](/info/TROUBLESHOOTING.MD)
+ 3) [Determining the original software.](/info/SOFTWARE.MD)
+ 4) Raw Dump Only: [Understanding how the data is stored on the tape for raw dumps](/info/RAW_DUMP.MD)
+ 5) Raw Dump Only: [Performing a raw dump](/info/SPLICES.MD)
+ 6) [Troubleshooting](/info/TROUBLESHOOTING.MD)
 
 Unfortunately, the guide can only go so far. I've done my best to document everything, but the guide is just a starting point.  
 I've done my best to include as many tools, documentation, and information as possible throughout this repository, and hopefully the guide can give proper context.  
