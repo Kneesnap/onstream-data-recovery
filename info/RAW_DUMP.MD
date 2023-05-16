@@ -102,10 +102,10 @@ The pattern is that a read will occur until the end of the tape is reached, wher
 Part of the parking zone in the center of the tape is skipped.  
 
 **ADR30 (30GB Tape Cartridge):**  
-![ADR30 Physical Position Pattern](/pictures/visual-aids/adr30-PhysicalBlock.png)  
+![ADR30 Physical Position Pattern](/pictures/visual-aids/Adr30-PhysicalBlock.png)  
 
 **ADR50 (50GB Tape Cartridge):**  
-![ADR50 Physical Position Pattern](/pictures/visual-aids/adr50-PhysicalBlock.png)  
+![ADR50 Physical Position Pattern](/pictures/visual-aids/Adr50-PhysicalBlock.png)  
 
 ### Logical Positions
 Tracking both X and Y is effective, but OnStream is still trying to be similar to other tape drives.  
@@ -115,10 +115,10 @@ However, the way these numbers get turned into physical X/Y positions will take 
 Below are the images showing the general pattern followed when reading/writing data using physical positions. (This pattern scales with the size of the tape)  
 
 **ADR30 (30GB Tape Cartridge):**  
-![ADR30 Logical Position Pattern](/pictures/visual-aids/adr30-LogicalBlock.png)  
+![ADR30 Logical Position Pattern](/pictures/visual-aids/Adr30-LogicalBlock.png)  
 
 **ADR50 (50GB Tape Cartridge):**  
-![ADR50 Logical Position Pattern](/pictures/visual-aids/adr50-LogicalBlock.png)  
+![ADR50 Logical Position Pattern](/pictures/visual-aids/Adr50-LogicalBlock.png)  
 
 ### Converting between Logical Positions & Physical Positions   
 [This folder](/archive/blocks/) contains text files which allow you to search for a logical block or a physical block, then get its alternative position, for example getting a physical position from a logical block position.  
