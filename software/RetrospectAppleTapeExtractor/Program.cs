@@ -1,6 +1,7 @@
 // See https://aka.ms/new-console-template for more information
 // https://opensource.apple.com/source/hfs/hfs-366.1.1/core/hfs_format.h.auto.html <-- this page was a helpful reference when making this.
 
+using System;
 using OnStreamTapeLibrary;
 using RetrospectTape;
 
