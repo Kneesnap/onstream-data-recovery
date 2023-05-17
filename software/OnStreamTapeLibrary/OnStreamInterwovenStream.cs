@@ -196,13 +196,16 @@ namespace OnStreamTapeLibrary
 
             blocksSkipped = 0;
             for (int i = oldBlockPos; i <= newBlockPos; i++) {
+                if (i >= interwovenStream.Blocks.Count - 1)
+                    break; // Don't include the last block, since there is no data after the last block, the data should not be considered "skipped", just empty.
+                
                 OnStreamTapeBlock block = interwovenStream.Blocks[i];
                 if (blocksSkipped == 0)
                     lastValidBlock = block;
                 
                 if (block.MissingBlockCount > 0) {
                     if (blocksSkipped == 0 && resumeAfterError)
-                        reader.Index = ((i + 1) * OnStreamDataStream.DataSectionSize);
+                        reader.Index = (i + 1) * OnStreamDataStream.DataSectionSize;
 
                     blocksSkipped += block.MissingBlockCount;
                 }
