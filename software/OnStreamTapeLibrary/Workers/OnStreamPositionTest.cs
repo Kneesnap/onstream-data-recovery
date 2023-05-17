@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils.Extensions;
 using OnStreamTapeLibrary.Position;
+using System.Collections.Generic;
 using System.IO;
 
 namespace OnStreamTapeLibrary.Workers
@@ -48,6 +49,29 @@ namespace OnStreamTapeLibrary.Workers
                 
                 logger.LogInformation($"{logicalBlock}/{physicalBlock:X8}: {logicalBlock2}/{pass1Str}, {physicalBlock2:X8}/{pass2Str}, {logicalBlock3}/{pass3Str}, {physicalBlock3:X8}/{pass4Str}");
             } while (position.TryIncreaseLogicalBlock());
+        }
+        
+        /// <summary>
+        /// Write a text file containing the mappings of physical block IDs to logical block IDs.
+        /// </summary>
+        /// <param name="folder">The folder to write results to.</param>
+        /// <param name="type">The tape cartridge type to test.</param>
+        public static void LogMappings(string folder, OnStreamCartridgeType type) {
+            // Physical to logical.
+            OnStreamPhysicalPosition position = type.FromLogicalBlock(0);
+            List<string> physicalToLogicalText = new List<string>();
+            do {
+                physicalToLogicalText.Add($"Physical Position: {position.ToPhysicalBlockString()} -> Logical Position: {position.ToLogicalBlockString()}");
+            } while (position.TryIncreasePhysicalBlock());
+            File.WriteAllLines(Path.Combine(folder, type.GetName() + "Blocks-PhysicalToLogical.txt"), physicalToLogicalText);
+
+            // Logical to physical.
+            position.FromLogicalBlock(0);
+            List<string> logicalToPhysicalText = new List<string>();
+            do {
+                logicalToPhysicalText.Add($"Logical Position: {position.ToLogicalBlockString()} -> Physical Position: {position.ToPhysicalBlockString()}");
+            } while (position.TryIncreaseLogicalBlock());
+            File.WriteAllLines(Path.Combine(folder, type.GetName() + "Blocks-LogicalToPhysical.txt"), logicalToPhysicalText);
         }
     }
 }

@@ -192,7 +192,7 @@ namespace OnStreamTapeLibrary
 
             lastValidBlock = reader.GetCurrentTapeBlock();
             int oldBlockPos = (int)(startIndex / OnStreamInterwovenStream.BufferLength);
-            int newBlockPos = (int)(startIndex / OnStreamInterwovenStream.BufferLength);
+            int newBlockPos = (int)(reader.Index / OnStreamInterwovenStream.BufferLength);
 
             blocksSkipped = 0;
             for (int i = oldBlockPos; i <= newBlockPos; i++) {

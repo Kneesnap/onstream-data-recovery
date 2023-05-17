@@ -104,11 +104,11 @@ In the end, the recovery was an unquestionable success.
 Thank you everyone who helped with this project, without your help who knows how long it would have taken or if the data would have even been recovered.  
 All the important data such as the VSS repository backup (source code history), final game assets, tools, and more were saved.  
 The tape was the only backup for those things, and it complete's Frogger 2's development archives, which will be released publicly.  
-It might sound bad that approximately 11.5GB of the 15GB written data was recovered, but this is misleading.  
+It might sound bad that approximately 12GB of the 15GB written data was recovered, but this is misleading.  
 A couple thousand files were damaged, but they make up less than 5% of the total files on the tape.  
 Nearly all of the damaged files were either found in another CD backup or were duplicated on another part of the tape.  
-There were only 16 files which were not perfectly recovered, and only one was noteworthy, a CD image of a PC game build from 1 month after release.  
-Having recovered 58157 out of the 58164 files on the tape, this adventure can only be considered a success.  
+There were only 15 files which were not perfectly recovered, and only one was noteworthy, a CD image of a PC game build from 1 month after release.  
+Having recovered 58149 out of the 58164 files on the tape, this adventure can only be considered a success.  
 Here's what the damage looks like to the Frogger 2 tape, showing the significant damage and how lucky the recovery was.  
 ![Frogger 2 Tape Damage](/pictures/visual-aids/frogger2-tape-damage.png)
 
