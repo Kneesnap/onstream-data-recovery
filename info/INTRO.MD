@@ -75,11 +75,11 @@ This is where the story should probably have stopped. Given up and called it a d
 At least they made good quality splices.  
 ![Example of one of the splices](/pictures/visual-aids/frogger2-splice-example.jpg)  
 
-### 4) It's hacking time baby.
-Time and time again, I've come to really learn that sometimes if you want something done right, you really do need to do it yourself.  
+### 4) It's hacking time, baby.
+Time and time again, I've come to really learn that sometimes if you want something done right, sometimes you really do need to do it yourself.  
 This really annoys me, because professional data recovery is expensive. If I hadn't chose a company which had a "no data recovered, no charge" policy, I would have paid thousands of dollars for them to screw up the tape.  
-That's insane, and I'm still upset that they told me they could even recover the data on the tape. I think they legitimately thought they could but didn't know.  
-But if you asked me at the time, you wouldn't have seen it. I used this as further motivation instead.  
+That's insane, and I'm still upset that they told me they could even recover the data on the tape. It feels like they didn't take their job seriously.  
+But if you asked me at the time, you wouldn't have known it upset me. I used it as further motivation instead.  
 Months of effort was spent understanding the drive, studying its SCSI command interface, reverse engineering firmware, reading documentation, digging up patents, etc.  
 While much was learned about the drive, the major breakthrough came just after midnight on April 5th 2023 and ended up being significantly simpler than the other attempted methods.  
 If the initialization process is the problem, then what if we were to run the initialization process with a working tape? Then, by tricking the drive sensors we could switch the tape without the drive knowing a swap occurred.  
@@ -91,7 +91,7 @@ Using this trick, all undamaged portions of the tape were dumped successfully.
 **Tape Dumping:**  
 ![A computer screen showing tape data getting dumped from the tape](/pictures/visual-aids/early-successful-dump.jpg)
 
-### 5a) ARCServe Sucks
+### 5a) ARCServe Sucks Too
 Now that I had the data off the tape, there was still one problem, it wasn't in a usable format.  
 The data which comes off the tape is formatted in whatever way the software which wrote it chose.  
 Unfortunately, that means every single compatible backup software product made their own proprietary format, including ARCserve.  
