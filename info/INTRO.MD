@@ -14,7 +14,7 @@ Unforunately, while tapes have good longevity, the tape drives did not. OnStream
 These drives are uncommon, especially the model which can use 50GB tapes. So, the first big hurdle was finding a compatible tape drive.  
 
 **Tape Picture:**  
-![Picture of the tape](/pictures/visual-aids/frogger2-tape-scan.png)
+![Picture of the tape](/pictures/visual-aids/frogger2-tape-scan.jpg)
 
 ### 1) Finding a compatible/working tape drive  
 I was lucky to know that I needed an "OnStream SC-50" tape drive, because that was the model written on the label of the tape.  
@@ -73,7 +73,7 @@ This is where the story should probably have stopped. Given up and called it a d
 
 **Splice Picture:**  
 At least they made good quality splices.  
-![Example of one of the splices](/picture/visual-aids/frogger2-splice-example.jpg)  
+![Example of one of the splices](/pictures/visual-aids/frogger2-splice-example.jpg)  
 
 ### 4) It's hacking time baby.
 Time and time again, I've come to really learn that sometimes if you want something done right, you really do need to do it yourself.  
