@@ -13,6 +13,9 @@ Tapes are great for backups and have very high longevity when stored properly. A
 Unforunately, while tapes have good longevity, the tape drives did not. OnStream, the company who made the tapes and tape drives ceased operations in 2003, after only just releasing their first drive in 1999.  
 These drives are uncommon, especially the model which can use 50GB tapes. So, the first big hurdle was finding a compatible tape drive.  
 
+**Tape Picture:**  
+![Picture of the tape](/pictures/visual-aids/frogger2-tape-scan.png)
+
 ### 1) Finding a compatible/working tape drive  
 I was lucky to know that I needed an "OnStream SC-50" tape drive, because that was the model written on the label of the tape.  
 And, I found one single business selling this drive online, so I pounced.
@@ -24,11 +27,14 @@ That drive was advertised as compatible with these tapes. When that drive worked
 At this point, I incorrectly concluded that there must have been a problem with the tape itself and it were damaged.  
 What had actually happened was that the ADR-50e drive was advertised as compatible, but there was a cave-at. It was only compatible with tapes which were written with an ADR-50e drive, or tapes written with certain software.  
 At this point, I didn't even know what software had been used to write the data, let alone this obscure quirk of the tape drive, it was advertised as compatible after all.  
-So assuming the tape was defective, I sent it in to a professional data recovery company, believing it to be a mistake. This was a HUGE mistake...  
+So assuming the tape was defective, I sent it in to a professional data recovery company, believing it to be damaged. This was a HUGE mistake...    
+
+**Melted Pinch Roller:**  
+![Melted Pinch Roller](/pictures/visual-aids/melted-pinch-roller.jpg)  
 
 ### 2) Professional Data Recovery Sucks  
 They were the professionals, right? They made it seem like they had a special method of recovering data for this kind of tape!  
-Their website said specifically that they could recover data from OnStream tapes, and they have good reviews.  
+Their website said specifically that they could recover data from OnStream tapes, and they had good non-botted reviews as far as I could tell.  
 Perhaps they were fine for common data storage types like hard drives or SSDs. Those should be easier since there are advanced recovery tools available for them.  
 However, I do not think I will ever consider sending tapes into a professional data recovery company again, even for more common digital tape formats.  
 
@@ -44,6 +50,7 @@ Over the span of about a month, I received very infrequent and vague communicati
 Eventually after a month and I had realized what the real problem was, and because things didn't sound good in data recovery, I asked for it to be sent back.  
 I was told that "it will perform the way it did when we received it". What a fucking lie. The tape I got back had been ripped in several spots, and spliced back together.  
 If this were like an audio tape or something archaic maybe it would have worked, but the tape I got back had problems which it did NOT have when I sent it in.  
+![Screenshot of the data recovery website](/pictures/visual-aids/data-recovery-screenshot.png)  
 
 **They were never capable of recovering the data:**  
 OnStream used technology that no other tape drives did. They had a dedicated data processing chip (ASIC), which was designed specifically for their machines, as opposed to the common chips available on other drives such as Travan.  
@@ -51,7 +58,7 @@ The entire data processing pipeline from the tape to digital data uses custom ha
 None of it was shared in any other tape drive. This effectively means that the only way to read data off of one of these tapes is to use one of the original tape drives, or the hardware inside of one.  
 This means that whatever machine they put the the tape I was recovering on was NOT compatible with OnStream tapes.  
 I don't know why they claimed to be able to recover data from OnStream tapes, but it's downright false advertising for their website to claim they can recover OnStream data.  
-They clearly didn't even have an OnStream tape drive, because it would have just worked if they did.  
+Their actions show they clearly didn't know how to recover data from OnStream tapes.  
 
 ### 3) The Realization  
 Unfortunately, this is only clear in hindsight.  
@@ -64,6 +71,10 @@ By this point I had found documentation on the commands which could be sent by a
 But because the tape would enter into an infinite retry loop when just inserted into the drive (a process henceforth referred to as "initialization"), the drive wasn't ever even reaching a state where the computer could tell the drive anything about what to do.  
 This is where the story should probably have stopped. Given up and called it a day, right? Maybe, but I care about this data, and I happen to know a thing or two about computers.  
 
+**Splice Picture:**  
+At least they made good quality splices.  
+![Example of one of the splices](/picture/visual-aids/frogger2-splice-example.jpg)  
+
 ### 4) It's hacking time baby.
 Time and time again, I've come to really learn that sometimes if you want something done right, you really do need to do it yourself.  
 This really annoys me, because professional data recovery is expensive. If I hadn't chose a company which had a "no data recovered, no charge" policy, I would have paid thousands of dollars for them to screw up the tape.  
@@ -73,6 +84,12 @@ Months of effort was spent understanding the drive, studying its SCSI command in
 While much was learned about the drive, the major breakthrough came just after midnight on April 5th 2023 and ended up being significantly simpler than the other attempted methods.  
 If the initialization process is the problem, then what if we were to run the initialization process with a working tape? Then, by tricking the drive sensors we could switch the tape without the drive knowing a swap occurred.  
 Using this trick, all undamaged portions of the tape were dumped successfully.
+
+**Modified Drive:**  
+![The modified tape drive](/pictures/visual-aids/onstream-modded-drive.jpg)
+
+**Tape Dumping:**  
+![A computer screen showing tape data getting dumped from the tape](/pictures/visual-aids/early-successful-dump.jpg)
 
 ### 5a) ARCServe Sucks
 Now that I had the data off the tape, there was still one problem, it wasn't in a usable format.  
@@ -98,6 +115,10 @@ This time it didn't take long to see that the missing data was in a position of 
 So, I modified my tools and the dumping program again to read the area "where no user data can be recorded".  
 Finally, after months of reverse engineering of ARCServe, the drive firmware, and other garbage, the program worked, and the data was saved.  
 Source code for the extraction program is included [here](/software/arcserve-file-extractor/).  
+
+**Recovered Files:**  
+![Program Output](/pictures/visual-aids/frogger2-arcserve-output.png)  
+![Recovered Files](/pictures/visual-aids/frogger2-recovered-files.png)  
 
 ### 6) The Resolution  
 In the end, the recovery was an unquestionable success.
