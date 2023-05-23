@@ -10,7 +10,7 @@ As one could imagine, this is priceless to recover. But how does one even read/w
 The average hard drive size in 1999/2000 seems to have been around 10GB, and hard drives are not known for their longevity.  
 OnStream tapes were a very appealing proposition because they could offer 50GB cartridges (25GB when uncompressed), which were cheaper than most hard drives!  
 Tapes are great for backups and have very high longevity when stored properly. And they could buy a tape drive that they could put into their computer just like a CD or floppy disk drive.  
-Unforunately, while tapes have good longevity, the tape drives did not. OnStream, the company who made the tapes and tape drives, ceased operations in 2003, after only just releasing their first drive in 1999.  
+Unfortunately, while tapes have good longevity, these tape drives did not. OnStream, the company who made the tapes and tape drives, ceased operations in 2003, after only just releasing their first drive in 1999.  
 These drives are uncommon, especially the model which can use 50GB tapes. So, the first big hurdle was finding a compatible tape drive.  
 
 **Tape Picture:**  
