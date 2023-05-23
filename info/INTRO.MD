@@ -8,9 +8,9 @@ I received a tape containing the "end of project" development for Frogger 2: Swa
 This tape is believed to be the only backup of the final game source code, game assets, and other development data.  
 As one could imagine, this is priceless to recover. But how does one even read/write data from a tape? Why did they even use tapes?  
 The average hard drive size in 1999/2000 seems to have been around 10GB, and hard drives are not known for their longevity.  
-OnStream tapes were a very appealing proposition because they could offer 50GB cartridges (25GB when uncompressed) cheaper than most hard drives!  
+OnStream tapes were a very appealing proposition because they could offer 50GB cartridges (25GB when uncompressed), which were cheaper than most hard drives!  
 Tapes are great for backups and have very high longevity when stored properly. And they could buy a tape drive that they could put into their computer just like a CD or floppy disk drive.  
-Unforunately, while tapes have good longevity, the tape drives did not. OnStream, the company who made the tapes and tape drives ceased operations in 2003, after only just releasing their first drive in 1999.  
+Unforunately, while tapes have good longevity, the tape drives did not. OnStream, the company who made the tapes and tape drives, ceased operations in 2003, after only just releasing their first drive in 1999.  
 These drives are uncommon, especially the model which can use 50GB tapes. So, the first big hurdle was finding a compatible tape drive.  
 
 **Tape Picture:**  
@@ -43,7 +43,7 @@ This company should have not advertised the capability of recovering data from t
 The company should have made the risks clear they they didn't know if whatever machine they used was even capable of recovering data from the tape instead of pretending they knew it was.  
 The company should not have told me they could recover data from this tape.  
 
-**What this company actually actually did:**  
+**What this company actually did:**  
 This company specifically advertised that they could recover data from OnStream tapes. Bullshit.  
 They clearly didn't even have an OnStream SC-50 tape drive, because if they did they could have just used the official Linux kernel from 10-20 years ago which came with a driver that could have dumped this data.  
 Over the span of about a month, I received very infrequent and vague communications from the company despite me providing extremely detailed technical information and questions.  
@@ -56,7 +56,7 @@ If this were like an audio tape or something archaic maybe it would have worked,
 OnStream used technology that no other tape drives did. They had a dedicated data processing chip (ASIC), which was designed specifically for their machines, as opposed to the common chips available on other drives such as Travan.  
 The entire data processing pipeline from the tape to digital data uses custom hardware designed from scratch for OnStream tape drives, because it let OnStream get way more capacity than any other tape company could at the time.  
 None of it was shared in any other tape drive. This effectively means that the only way to read data off of one of these tapes is to use one of the original tape drives, or the hardware inside of one.  
-This means that whatever machine they put the the tape I was recovering on was NOT compatible with OnStream tapes.  
+In other words, whatever machine they put the the tape I was recovering on was NOT compatible with OnStream tapes.  
 I don't know why they claimed to be able to recover data from OnStream tapes, but it's downright false advertising for their website to claim they can recover OnStream data.  
 Their actions show they clearly didn't know how to recover data from OnStream tapes.  
 
@@ -104,12 +104,12 @@ Yet, despite ARCserve showing a popup which says "Restoration Successful", it re
 For an undamaged several gigabyte tape which takes two hours for ARCserve to read, it will restore about 1MB of data total.  
 
 ### 5b) Making it usable
-In order to put bring the files into a usable format (.zip), I had to write a program to convert the tape dumps from the ARCserve format into a .zip.  
+In order to convert the files into a usable format (.zip), I had to write a program to convert the tape dumps from the ARCserve format into a .zip.  
 Thankfully, the ARCserve format wasn't very complex and I figured it out pretty quickly.  
 However, there was something strange. An abnormally high amount of files were exporting improperly.  
 After spending some time analyzing data and thinking, it became apparent that ARCserve was using an undocumented mode for reading the tape. 
-This is explained in more depth in [the guide](/info/RAW_DUMP.MD), but ARCServe was using an undocumented feature not documented in the [official OnStream driver development document](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf).  
-This undocumented feature allowed ARCserve to read and write data in a way where it would read/write in a way completely different from how the documentation said to do it.  
+This is explained in more depth in [the guide](/info/RAW_DUMP.MD), but ARCServe was using a feature not documented in the [official OnStream driver development document](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf).  
+This undocumented feature allowed ARCServe to read and write data in a completely different pattern from what the documentation described.  
 Even after changing my program to read data in the undocumented way ARCserve did it, I still saw errors which I didn't expect to see.  
 This time it didn't take long to see that the missing data was in a position of the tape which [the documentation](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf) explicitly states "no user data can be recorded".  
 So, I modified my tools and the dumping program again to read the area "where no user data can be recorded".  
@@ -124,7 +124,7 @@ Source code for the extraction program is included [here](/software/arcserve-fil
 In the end, the recovery was an unquestionable success.
 Thank you everyone who helped with this project, without your help who knows how long it would have taken or if the data would have even been recovered.  
 All the important data such as the VSS repository backup (source code history), final game assets, tools, and more were saved.  
-The tape was the only backup for those things, and it complete's Frogger 2's development archives, which will be released publicly.  
+The tape was the only backup for those things, and it completes Frogger 2's development archives, which will be released publicly.  
 It might sound bad that approximately 12GB of the 15GB written data was recovered, but this is misleading.  
 A couple thousand files were damaged, but they make up less than 5% of the total files on the tape.  
 Nearly all of the damaged files were either found in another CD backup or were duplicated on another part of the tape.  
