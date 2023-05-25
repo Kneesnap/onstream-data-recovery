@@ -25,7 +25,7 @@ Eventually, I concluded the drive was broken, and looking inside proved this to 
 My efforts to fix the drive were let's say unsuccessful, so I looked for another drive. Because there were no other options, I got an ADR-50e.
 That drive was advertised as compatible with these tapes. When that drive worked with my "test tape" (a blank tape I had purchased exclusively for testing), but still refused to read the Frogger tape.  
 At this point, I incorrectly concluded that there must have been a problem with the tape itself and it were damaged.  
-What had actually happened was that the ADR-50e drive was advertised as compatible, but there was a cave-at. It was only compatible with tapes which were written with an ADR-50e drive, or tapes written with certain software.  
+What had actually happened was that the ADR-50e drive was advertised as compatible, but there was a caveat. It was only compatible with tapes which were written with an ADR-50e drive, or tapes written with certain software.  
 At this point, I didn't even know what software had been used to write the data, let alone this obscure quirk of the tape drive, it was advertised as compatible after all.  
 So assuming the tape was defective, I sent it in to a professional data recovery company, believing it to be damaged. This was a HUGE mistake...    
 
