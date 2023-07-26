@@ -52,12 +52,12 @@ When we want to let the drive operate normally, we separate the wires from each 
 The tape drive is capable of reading most of the damaged tape now, but you'll need to follow a special process to do so.  
  - 1) Insert an undamaged tape of the same type as the one you want to read.  
  - 2) Wait for the tape drive to become silent (accepting the tape), with the status LED off.  
- - 2b) If the desired read area is before the parking zone (50GB tapes only), use [onstreamsg](/software/onstream_raw_dump/) to move the tape somewhere before the parking zone.  
- - 3) Trick the drive with the breadboard into thinking a tape is always inserted.  
- - 4) Forcibly eject the tape by sliding a Q-tip, toothpick, or, any other rod in the manual eject track on the bottom of the tape drive.  
- - 5) Insert the damaged tape.  
- - 6) Stop tricking the tape drive with the breadboard. (This will prevent weird issues)  
- - 7) You are now able to read data with the [onstreamsg](/software/onstream_raw_dump/) program.  
+ - 3) If the desired read area is before the parking zone (50GB tapes only), use [onstreamsg](/software/onstream_raw_dump/) to move the tape somewhere before the parking zone.  
+ - 4) Trick the drive with the breadboard into thinking a tape is always inserted.  
+ - 5) Forcibly eject the tape by sliding a Q-tip, toothpick, or, any other rod in the manual eject track on the bottom of the tape drive.  
+ - 6) Insert the damaged tape.  
+ - 7) Stop tricking the tape drive with the breadboard. (This will prevent weird issues)  
+ - 8) You are now able to read data with the [onstreamsg](/software/onstream_raw_dump/) program.  
  
 **4) Reading Data:**  
 Once you've successfully hotswapped the tape, you are now able to use [onstreamsg](/software/onstream_raw_dump/) to dump data from the tape.  
