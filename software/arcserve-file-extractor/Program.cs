@@ -7,7 +7,6 @@ using OnStreamTapeLibrary;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Text;
 
 if (args.Length == 0) {
     Console.WriteLine("Usage: Extract.exe <Path to tape config>");
@@ -17,10 +16,34 @@ if (args.Length == 0) {
 string inputFilePath = string.Join(" ", args);
 
 // Read the provided tape config.
-using SimpleLogger consoleLogger = new SimpleLogger();
+using SimpleLogger consoleLogger = new FileLogger("tape-info.log");
 TapeDefinition? inputTapeCfg = TapeDefinition.LoadFromConfigFile(inputFilePath, consoleLogger);
 if (inputTapeCfg == null)
     return;
 
 // Do something with that config.
 ArcServeFileExtractor.ExtractFilesFromTapeDumps(inputTapeCfg);
+
+using ZipArchive? archive = ArcServeFileExtractor.OpenExtractedZipArchive(inputTapeCfg, consoleLogger);
+if (archive == null)
+    return;
+
+var results = FileIdentificationScanner.IdentifyFilesInZipFile(archive, consoleLogger);
+
+// Edit results to only show relevant stuff for Frogger2 tape.
+/*results.Remove(KnownFileType.TifFile);
+results.Remove(KnownFileType.GifFile);
+results.Remove(KnownFileType.BmpFile);
+results.Remove(KnownFileType.WavFile);
+results.Remove(KnownFileType.AviFile);
+results.Remove(KnownFileType.TimFile);
+results.Remove(KnownFileType.PdfFile);
+results.Remove(KnownFileType.JpegFile);
+if (results.TryGetValue(KnownFileType.WindowsExe, out var fileList))
+    fileList.RemoveAll(entry =>
+        entry?.FilePath != null && entry.Value.FilePath.Contains("\\DevStudio\\", StringComparison.InvariantCulture));
+
+results.Remove(KnownFileType.WavFile);*/
+
+// Show Results:
+FileIdentificationScanner.LogIdentifiedFiles(consoleLogger, results);

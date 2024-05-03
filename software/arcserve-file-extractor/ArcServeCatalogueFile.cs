@@ -56,27 +56,9 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="logger">The logger to log output to.</param>
         public static void FindMissingFilesFromTapeZip(TapeDefinition tape, ILogger logger)
         {
-            string zipFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + ".zip");
-            if (!File.Exists(zipFilePath)) {
-                DirectoryInfo? parentDir = Directory.GetParent(tape.FolderPath);
-
-                if (parentDir != null) {
-                    string parentFilePath = Path.Combine(parentDir.FullName, tape.DisplayName + ".zip");
-                    if (File.Exists(parentFilePath))
-                        zipFilePath = parentFilePath;
-                }
-
-                if (!File.Exists(zipFilePath)) {
-                    logger.LogError($"Expected to find file '{zipFilePath}', but it does not exist!");
-                    return;
-                }
-
-            }
-
-            using FileStream fileStream = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
-            using BufferedStream bufferedStream = new BufferedStream(fileStream);
-            using ZipArchive archive = new ZipArchive(bufferedStream, ZipArchiveMode.Read);
-            ArcServeCatalogueFile.FindMissingFilesFromZipFile(archive, logger);
+            using ZipArchive? archive = ArcServeFileExtractor.OpenExtractedZipArchive(tape, logger);
+            if (archive != null)
+                ArcServeCatalogueFile.FindMissingFilesFromZipFile(archive, logger);
         }
         
         /// <summary>

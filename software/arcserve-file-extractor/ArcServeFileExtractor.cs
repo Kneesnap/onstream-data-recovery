@@ -193,5 +193,34 @@ namespace OnStreamSCArcServeExtractor
 
             return true;
         }
+
+        /// <summary>
+        /// Attempt to open a zip file which has already been extracted.
+        /// </summary>
+        /// <param name="tape">The tape definition to load from.</param>
+        /// <param name="logger">The logger to log information to.</param>
+        /// <returns>The zip archive opened, or null if it was not opened.</returns>
+        public static ZipArchive? OpenExtractedZipArchive(TapeDefinition tape, ILogger logger) {
+            string zipFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + ".zip");
+            if (!File.Exists(zipFilePath)) {
+                DirectoryInfo? parentDir = Directory.GetParent(tape.FolderPath);
+
+                if (parentDir != null) {
+                    string parentFilePath = Path.Combine(parentDir.FullName, tape.DisplayName + ".zip");
+                    if (File.Exists(parentFilePath))
+                        zipFilePath = parentFilePath;
+                }
+
+                if (!File.Exists(zipFilePath)) {
+                    logger.LogError($"Expected to find file '{zipFilePath}', but it does not exist!");
+                    return null;
+                }
+            }
+
+            // These resources will be cleared when disposed.
+            FileStream fileStream = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read);
+            BufferedStream bufferedStream = new BufferedStream(fileStream);
+            return new ZipArchive(bufferedStream, ZipArchiveMode.Read);
+        }
     }
 }
