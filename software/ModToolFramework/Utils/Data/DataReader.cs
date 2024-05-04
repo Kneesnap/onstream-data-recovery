@@ -28,6 +28,36 @@ namespace ModToolFramework.Utils.Data
 
         public DataReader(Stream inStream, bool leaveOpen = false) : base(inStream, Encoding.UTF8, leaveOpen) {
         }
+        
+        /// <summary>
+        /// Skip bytes, requiring the bytes skipped be 0.
+        /// </summary>
+        /// <param name="amount">The number of bytes to skip</param>
+        public void SkipBytesRequireEmpty(int amount) {
+            SkipBytesRequire(DataConstants.NullByte, amount);
+        }
+        
+        /// <summary>
+        /// Skip bytes, requiring the bytes skipped be the expected value.
+        /// </summary>
+        /// <param name="expected">The value to require</param>
+        /// <param name="amount">The amount of bytes to skip</param>
+        /// <exception cref="Exception">Thrown if some of the bytes are not expected</exception>
+        public void SkipBytesRequire(byte expected, int amount) {
+            long index = this.Index;
+            if (amount == 0)
+                return;
+
+            if (amount < 0)
+                throw new Exception($"Tried to skip {amount} bytes.");
+
+            // Skip bytes.
+            for (int i = 0; i < amount; i++) {
+                byte nextByte = ReadByte();
+                if (nextByte != expected)
+                    throw new Exception($"Reader wanted to skip {amount} bytes to reach 0x{(index + amount):X8}, but got 0x{nextByte:X2} at {(index + i):X} when 0x{expected:X2} was desired.");
+            }
+        }
 
         /// <summary>
         /// Align the reader to the next multiple of the provided value.

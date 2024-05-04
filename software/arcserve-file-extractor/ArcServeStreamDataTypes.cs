@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
+using ModToolFramework.Utils.Extensions;
 using TestBed;
 
 namespace OnStreamSCArcServeExtractor
@@ -148,13 +149,23 @@ namespace OnStreamSCArcServeExtractor
         public uint Id;
         public StreamFileSystem FileSystem;
         public ulong Size;
-        public uint Zero;
+        public uint NameSize;
         public uint Type;
         public uint RawFlags;
+        public string Name;
 
         public StreamFlags Flags => (StreamFlags)this.RawFlags;
 
         public const int SizeInBytes = 32;
+
+        /// <inheritdoc cref="ValueType.ToString"/>
+        public override string ToString() {
+            if (string.IsNullOrWhiteSpace(this.Name)) {
+                return $"{this.FileSystem.GetName()}/{this.Id:X8}/{this.Type:X8}/{this.Size}/{this.RawFlags:X}";
+            } else {
+                return $"'{this.Name}'/{this.FileSystem.GetName()}/{this.Id:X8}/{this.Type:X8}/{this.Size}/{this.RawFlags:X}";
+            }
+        }
     }
 
     public enum StreamFileSystem : uint

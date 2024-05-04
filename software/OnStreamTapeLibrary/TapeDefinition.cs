@@ -215,7 +215,7 @@ namespace OnStreamTapeLibrary
         /// Creates a matcher string for testing if a cached block definition matches this block definition.
         /// </summary>
         /// <returns>matcherString</returns>
-        public String CreateMatcherString() {
+        public string CreateMatcherString() {
             if (this.DumpFilePath == null)
                 throw new DataException("Cannot create matcher string when the file path is null.");
             

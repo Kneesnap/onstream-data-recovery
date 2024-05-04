@@ -29,10 +29,8 @@ namespace OnStreamSCArcServeExtractor
         /// </summary>
         /// <param name="reader">The reader to read from.</param>
         public static ArcServeCatalogueFile Read(DataReader reader) {
-            _ = reader.ReadUInt32(); // Signature.
-            
             ArcServeCatalogueFile newFile = new ArcServeCatalogueFile();
-            ArcServe.ReadSessionHeader(reader, out newFile.SessionHeader);
+            ArcServeSessionHeader.ReadSessionHeader(reader, out newFile.SessionHeader);
             reader.Align(ArcServe.RootSectorSize);
 
             newFile.Name = reader.ReadFixedSizeString(24);
@@ -88,7 +86,7 @@ namespace OnStreamSCArcServeExtractor
         }
         
         private static void FindMissingFilesFromCatFile(ZipArchive archive, ArcServeCatalogueFile file, ILogger logger) {
-            string lastPath = file.SessionHeader.BasePath ?? string.Empty;
+            string lastPath = file.SessionHeader.RootDirectoryPath ?? string.Empty;
 
             long matchesFound = 0;
             long errorsFound = 0;

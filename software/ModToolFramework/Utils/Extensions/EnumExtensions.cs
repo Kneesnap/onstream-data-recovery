@@ -123,16 +123,33 @@ namespace ModToolFramework.Utils.Extensions
                 return invalidReturnsPlaceholder ? enumValue.GetInvalidName() : null;
             return name;
         }
-        
+
         /// <summary>
         /// Gets an enum as the largest unsigned primitive number type.
         /// </summary>
         /// <param name="value">The enum value to get.</param>
         /// <typeparam name="TEnum">The enum's type.</typeparam>
         /// <returns>numericEnumValue</returns>
-        public static ulong GetAsNumber<TEnum>(this TEnum value) where TEnum : struct, Enum 
-            => (ulong)(object)value;
-        
+        public static ulong GetAsNumber<TEnum>(this TEnum value) where TEnum : struct, Enum
+        {
+            var underlyingType = Enum.GetUnderlyingType(typeof(TEnum));
+            TypeCode typeCode = Type.GetTypeCode(underlyingType);
+            return typeCode switch
+            {
+                TypeCode.Byte => (byte) (object) value,
+                TypeCode.SByte => unchecked((ulong) (sbyte) (object) value),
+                TypeCode.Char => (char) (object) value,
+                TypeCode.Int16 => unchecked((ulong) (short) (object) value),
+                TypeCode.UInt16 => (ushort) (object) value,
+                TypeCode.Int32 => unchecked((ulong) (int) (object) value),
+                TypeCode.UInt32 => (uint) (object) value,
+                TypeCode.Int64 => unchecked((ulong) (long) (object) value),
+                TypeCode.UInt64 => (ulong) (object) value,
+                _ => throw new InvalidOperationException(
+                    $"Cannot read enum value from primitive type {underlyingType.GetDisplayName()}. Type Code: {typeCode.CalculateName()}")
+            };
+        }
+
         /// <summary>
         /// Gets an enum as a particular primitive number type.
         /// </summary>

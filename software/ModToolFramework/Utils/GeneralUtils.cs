@@ -152,7 +152,21 @@ namespace ModToolFramework.Utils {
             Array.Copy(array, startIndex, subset, 0, length);
             return subset;
         }
+        
+        /// <summary>
+        /// Tests if all of the elements in the array are the default.
+        /// </summary>
+        /// <typeparam name="T">The array value type.</typeparam>
+        /// <param name="array">The array to test</param>
+        /// <returns>subArray</returns>
+        public static bool IsDefaultArray<T>(this T[] array) {
+            T defaultElement = default(T);
+            for (int i = 0; i < array.Length; i++)
+                if (Equals(array[i], defaultElement))
+                    return false;
 
+            return true;
+        }
 
         /// <summary>
         /// Gets a string representation of the array values.
@@ -174,6 +188,8 @@ namespace ModToolFramework.Utils {
                 return "[]";
             if (startIndex + length > array.Length)
                 throw new ArgumentOutOfRangeException(nameof(length), $"Too many elements to get from array! (Start Index: {startIndex}, Length: {length}, Array Length: {array.Length})");
+            if (array is byte[] byteArray)
+                return "[" + DataUtils.ToString(byteArray) + "]";
             
             StringBuilder stringBuilder = new StringBuilder("[");
             for (int i = startIndex; i < startIndex + length; i++) {

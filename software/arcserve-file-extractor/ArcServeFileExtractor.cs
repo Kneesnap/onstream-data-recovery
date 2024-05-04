@@ -61,9 +61,6 @@ namespace OnStreamSCArcServeExtractor
             if (File.Exists(zipFilePath))
                 File.Delete(zipFilePath);
             using ZipArchive archive = ZipFile.Open(zipFilePath, ZipArchiveMode.Create, Encoding.UTF8);
-
-            // Setup reader
-            using DataReader reader = new DataReader(new OnStreamInterwovenStream(tape.CreatePhysicallyOrderedBlockList(blockMapping)));
             TapeDumpData tapeData = new TapeDumpData(tape, archive);
 
             // Start reading all the files.
@@ -97,20 +94,15 @@ namespace OnStreamSCArcServeExtractor
         private static bool TryReadSection(uint magic, DataReader reader, TapeDumpData dumpData, ILogger logger) {
             if (magic == 0x00000000U) {
                 // Do nothing, empty sector.
-            } else if (magic == 0xDDDDDDDDU) { // Tape header.
-                ArcServe.ReadSessionHeader(reader, out ArcServeSessionHeader header);
-                if (ArcServe.IsValidLookingString(header.BasePath)) {
-                    // New data.
-                    dumpData.CurrentBasePath = header.BasePath;
-                    logger.LogInformation("");
-                    logger.LogInformation("New Session:");
-                    logger.LogInformation($" - Base Path: '{header.BasePath}'");
-                    logger.LogInformation($" - Description: '{header.Description}'");
-                    logger.LogInformation($" - OS Username: '{header.OsUserName}'");
-                    logger.LogInformation($" - Password: '{header.Password}'");
-                    logger.LogInformation($" - Flags: {header.Flags:X}");
-                    logger.LogInformation("");
-                }
+            } else if (Enum.IsDefined(typeof(ArcServeSessionHeaderSignature), magic)) { // Tape header.
+                ArcServeSessionHeaderSignature signature = (ArcServeSessionHeaderSignature) magic;
+                ArcServeSessionHeader.ReadSessionHeader(reader, signature, out ArcServeSessionHeader header);
+                if (ArcServe.IsValidLookingString(header.RootDirectoryPath))
+                    dumpData.CurrentBasePath = header.RootDirectoryPath;
+
+                logger.LogInformation("");
+                header.PrintSessionHeaderInformation(logger);
+                logger.LogInformation("");
             } else if (magic == 0xCCCCCCCCU) { // File ending.
                 string dosPath = reader.ReadFixedSizeString(246);
                 uint crcHash = reader.ReadUInt32();
@@ -121,9 +113,10 @@ namespace OnStreamSCArcServeExtractor
                 logger.LogInformation($" - Reached End of File: {dosPath}, Hash: {crcHash}");
 
                 // TODO: If this is a file (not a directory), check CRC hash matches. (Unless CRC hash is zero..?)
-            } else if (magic == 0xABBAABBAU) {
+            } else if (magic == 0xABBAABBAU || magic == 0xBBBBBBBBU) {
                 return TryReadFileContents(reader, dumpData, logger);
             } else {
+                logger.LogWarning(" - Skipping unrecognized section '{magic:X8}'.", magic);
                 return false;
             }
 
@@ -131,7 +124,7 @@ namespace OnStreamSCArcServeExtractor
         }
 
         private static bool TryReadFileContents(DataReader reader, TapeDumpData data, ILogger logger) {
-            OnStreamTapeBlock currentTapeBlock = reader.GetCurrentTapeBlock();
+            OnStreamTapeBlock? currentTapeBlock = data.Config.HasOnStreamAuxData ? reader.GetCurrentTapeBlock() : null;
             ArcServe.ReadFileEntry(reader, logger, out ArcServeFileDefinition fileDefinition);
 
             string fullFilePath = fileDefinition.FullPath;
@@ -141,13 +134,13 @@ namespace OnStreamSCArcServeExtractor
 
             // Log info.
             logger.LogInformation($"Found: {fullFilePath}, {DataUtils.ConvertByteCountToFileSize(fileDefinition.FileSizeInBytes)}"
-                + $" @ {reader.GetFileIndexDisplay()}, Block: {currentTapeBlock.LogicalBlockString}/{currentTapeBlock.PhysicalBlock:X8}"
+                + $" @ {reader.GetFileIndexDisplay()}, Block: {currentTapeBlock?.LogicalBlockString}/{currentTapeBlock?.PhysicalBlock:X8}"
                 + $" | Creation: {fileDefinition.FileCreationTime}, Last Modification: {fileDefinition.LastModificationTime}");
 
             if (ArcServe.FastDebuggingEnabled)
                 return true;
 
-            if (string.IsNullOrWhiteSpace(fileDefinition.DosPath))
+            if (string.IsNullOrWhiteSpace(fileDefinition.RelativeFilePath))
                 return true; // It's not a file entry, but instead first file in a session.
 
             // Handle file.
