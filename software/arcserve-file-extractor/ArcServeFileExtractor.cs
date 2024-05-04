@@ -64,19 +64,21 @@ namespace OnStreamSCArcServeExtractor
             TapeDumpData tapeData = new TapeDumpData(tape, archive);
 
             // Start reading all the files.
+            long invalidSectionCount = 0;
             while (reader.HasMore) {
                 long preReadIndex = reader.Index;
                 uint magic = reader.ReadUInt32();
-
+                
                 try {
-                    _ = TryReadSection(magic, reader, tapeData, logger);
+                    _ = TryReadSection(magic, reader, tapeData, logger, ref invalidSectionCount);
                 } catch (Exception ex) {
-                    logger.LogError(ex.ToString());
-                    logger.LogError($"Encountered an error while reading the data at {reader.GetFileIndexDisplay(preReadIndex)}.");
+                    invalidSectionCount++;
+                    logger.LogError("{error}", ex.ToString());
+                    logger.LogError("Encountered an error while reading the data at {preReadIndex}.", reader.GetFileIndexDisplay(preReadIndex));
                 }
 
-                if (reader.WasMissingDataSkipped(preReadIndex, true, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock)) {
-                    logger.LogError($"Skipped {blocksSkipped} tape missing tape block(s) from after {lastValidBlock.PhysicalBlock:X8}/{lastValidBlock.LogicalBlockString}.");
+                if (tape.HasOnStreamAuxData && reader.WasMissingDataSkipped(preReadIndex, true, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock)) {
+                    logger.LogError(" - Skipped {blocksSkipped} missing tape block(s) from after {lastValidPhysicalBlock:X8}/{lastValidBlock}.", blocksSkipped, lastValidBlock.PhysicalBlock, lastValidBlock.LogicalBlockString);
                 }
 
                 reader.Align(ArcServe.RootSectorSize);
@@ -91,10 +93,11 @@ namespace OnStreamSCArcServeExtractor
             ArcServeCatalogueFile.FindMissingFilesFromZipFile(readZipFile, logger);
         }
 
-        private static bool TryReadSection(uint magic, DataReader reader, TapeDumpData dumpData, ILogger logger) {
+        private static bool TryReadSection(uint magic, DataReader reader, TapeDumpData dumpData, ILogger logger, ref long skipCount) {
             if (magic == 0x00000000U) {
                 // Do nothing, empty sector.
             } else if (Enum.IsDefined(typeof(ArcServeSessionHeaderSignature), magic)) { // Tape header.
+                ShowSkippedCount(logger, ref skipCount);
                 ArcServeSessionHeaderSignature signature = (ArcServeSessionHeaderSignature) magic;
                 ArcServeSessionHeader.ReadSessionHeader(reader, signature, out ArcServeSessionHeader header);
                 if (ArcServe.IsValidLookingString(header.RootDirectoryPath))
@@ -104,23 +107,35 @@ namespace OnStreamSCArcServeExtractor
                 header.PrintSessionHeaderInformation(logger);
                 logger.LogInformation("");
             } else if (magic == 0xCCCCCCCCU) { // File ending.
+                ShowSkippedCount(logger, ref skipCount);
                 string dosPath = reader.ReadFixedSizeString(246);
                 uint crcHash = reader.ReadUInt32();
                 reader.SkipBytes(258);
-                if (!ArcServe.IsValidLookingString(dosPath))
+                if (!ArcServe.IsValidLookingString(dosPath)) {
+                    skipCount++;
                     return false;
+                }
 
                 logger.LogInformation($" - Reached End of File: {dosPath}, Hash: {crcHash}");
 
                 // TODO: If this is a file (not a directory), check CRC hash matches. (Unless CRC hash is zero..?)
             } else if (magic == 0xABBAABBAU || magic == 0xBBBBBBBBU) {
+                ShowSkippedCount(logger, ref skipCount);
                 return TryReadFileContents(reader, dumpData, logger);
             } else {
-                logger.LogWarning(" - Skipping unrecognized section '{magic:X8}'.", magic);
+                skipCount++;
                 return false;
             }
 
             return true;
+        }
+
+        private static void ShowSkippedCount(ILogger logger, ref long skipCount) {
+            if (skipCount <= 0)
+                return;
+
+            logger.LogWarning("Skipped {sectionCount} section(s) which did not appear to be valid.", skipCount);
+            skipCount = 0;
         }
 
         private static bool TryReadFileContents(DataReader reader, TapeDumpData data, ILogger logger) {
@@ -163,23 +178,24 @@ namespace OnStreamSCArcServeExtractor
 
                 uint sectionId = 0;
                 long writtenByteCount = 0;
-                while (fileDefinition.FileSizeInBytes > writtenByteCount) {
+                for (int i = 0; i < (fileDefinition.StreamChunks?.Count ?? 0); i++) {
                     long tempStartIndex = reader.Index;
-                    ArcServeStreamRawData rawData = ArcServe.RequireSection<ArcServeStreamRawData>(reader, logger);
+                    
+                    // Get the raw data chunk.
+                    ArcServeStreamData streamDataChunk = fileDefinition.StreamChunks[i];
+                    if (streamDataChunk is not ArcServeStreamRawData rawData)
+                        continue;
 
                     writtenByteCount += (uint)rawData.UsableData.Length;
                     if (rawData.ExpectedDecompressedSize != 0 && rawData.RawData != rawData.UsableData && rawData.UsableData.Length != rawData.ExpectedDecompressedSize)
-                        logger.LogWarning($" - Section {sectionId} (At {reader.GetFileIndexDisplay(tempStartIndex)}) was expected to decompress to {rawData.ExpectedDecompressedSize} bytes, but actually decompressed to {rawData.UsableData.Length} bytes.");
+                        logger.LogWarning(" - Section {sectionId} (At {tempStartIndex}) was expected to decompress to {rawDataExpectedDecompressedSize} bytes, but actually decompressed to {rawDataUsableLength} bytes.", sectionId, reader.GetFileIndexDisplay(tempStartIndex), rawData.ExpectedDecompressedSize, rawData.UsableData.Length);
 
                     writer.Write(rawData.UsableData);
                     sectionId++;
                 }
 
                 if (writtenByteCount != fileDefinition.FileSizeInBytes)
-                    logger.LogError($" - The resulting file is supposed to be {fileDefinition.FileSizeInBytes} bytes, but we only wrote {writtenByteCount} bytes.");
-
-                // Ensure end of data.
-                ArcServe.RequireSection<ArcServeStreamEndData>(reader, logger);
+                    logger.LogError(" - The resulting file is supposed to be {fileSizeInBytes} bytes, but we wrote {writtenByteCount} bytes instead.", fileDefinition.FileSizeInBytes, writtenByteCount);
             } else {
                 return false;
             }

@@ -39,25 +39,35 @@ namespace OnStreamSCArcServeExtractor
             
             // Read data chunks.
             long sectionReadStart = reader.Index;
-            ArcServeStreamData streamData;
             List<ArcServeStreamData> streamChunks = definition.StreamChunks = new List<ArcServeStreamData>();
-            while ((streamData = ParseSection(reader, logger)) is not ArcServeStreamEndData) {
-                if (streamData is ArcServeStreamWindowsFileName fileNamePacket)
-                    definition.FileDeclaration = fileNamePacket;
-                if (streamData is ArcServeStreamFullPathData fullPathPacket)
-                    definition.FullPathData = fullPathPacket;
-                
-                streamChunks.Add(streamData);
+
+            long lastChunkDataStart = sectionReadStart;
+            try {
+                ArcServeStreamData streamData;
+                while ((streamData = ParseSection(reader, logger)) is not ArcServeStreamEndData)
+                {
+                    if (streamData is ArcServeStreamWindowsFileName fileNamePacket)
+                        definition.FileDeclaration = fileNamePacket;
+                    if (streamData is ArcServeStreamFullPathData fullPathPacket)
+                        definition.FullPathData = fullPathPacket;
+
+                    streamChunks.Add(streamData);
+                    lastChunkDataStart = reader.Index;
+
+                }
+            } catch (Exception ex) {
+                logger.LogTrace(ex, "Failed when parsing stream chunk at {lastChunkDataStart}", reader.GetFileIndexDisplay(lastChunkDataStart));
             }
 
             if (!definition.IsDirectory && !definition.IsFile)
-                logger.LogError($" - Expected the type at {reader.GetFileIndexDisplay(sectionReadStart)} to either be a File or a Directory, but got {definition.FileDeclaration?.Block.Type:X8} instead.");
+                logger.LogError(" - Expected the type at {sectionReadStart} to either be a File or a Directory, but got {blockType:X8} instead.", reader.GetFileIndexDisplay(sectionReadStart), definition.FileDeclaration?.Block.Type);
         }
         
         /// <summary>
         /// Parses an ArcServe timestamp into <see cref="DateTime"/>.
         /// </summary>
         /// <param name="number">The ArcServe timestamp</param>
+        /// <param name="startYear">The year which the timestamp counts upwards from</param>
         /// <returns>Parsed timestamp</returns>
         public static DateTime ParseTimeStamp(uint number, uint startYear = 1980) {
             if (number == 0)
