@@ -22,17 +22,19 @@ namespace OnStreamTapeLibrary
         public readonly OnStreamCartridgeType Type;
         public readonly string DisplayName;
         public readonly string FolderPath;
+        public readonly bool HasOnStreamAuxData;
         public readonly Config Config;
         public readonly List<TapeDumpFile> Entries = new List<TapeDumpFile>();
         public readonly HashSet<uint> SkippedPhysicalBlocks = new HashSet<uint>();
 
-        private TapeDefinition(OnStreamCartridgeType type, string displayName, string folderPath, Config config) {
+        private TapeDefinition(OnStreamCartridgeType type, string displayName, string folderPath, bool hasOnStreamAuxData, Config config) {
             this.Type = type;
             this.DisplayName = displayName;
             this.Config = config;
             this.FolderPath = folderPath;
+            this.HasOnStreamAuxData = hasOnStreamAuxData;
         }
-
+        
         /// <summary>
         /// Find a tape dump by its name or file name.
         /// </summary>
@@ -152,7 +154,8 @@ namespace OnStreamTapeLibrary
 
             OnStreamCartridgeType type = config.GetValueOrError("type").GetAsEnum<OnStreamCartridgeType>();
             string displayName = config.GetValue("name")?.GetAsString() ?? config.SectionName;
-            TapeDefinition newTapeConfig = new TapeDefinition(type, displayName, tapeFolder, config);
+            bool hasAuxData = config.GetValue("hasAuxData")?.GetAsBoolean() ?? (type != OnStreamCartridgeType.Raw);
+            TapeDefinition newTapeConfig = new TapeDefinition(type, displayName, tapeFolder, hasAuxData, config);
 
             if (config.HasKey("skip")) {
                 string[] skippedStr = config.GetValue("skip").GetAsString().Split(",", StringSplitOptions.RemoveEmptyEntries);

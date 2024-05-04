@@ -19,10 +19,11 @@ namespace OnStreamSCArcServeExtractor
         /// <summary>
         /// Reads the definition of a file, stopping right before the file data begins, if there is any.
         /// </summary>
+        /// <param name="header">Information about the tape session</param>
         /// <param name="reader">The reader to read from.</param>
         /// <param name="logger">The logger to write information to.</param>
         /// <param name="definition">Output storage for the file definition.</param>
-        public static void ReadFileEntry(DataReader reader, ILogger logger, out ArcServeFileDefinition definition) {
+        public static void ReadFileEntry(in ArcServeSessionHeader header, DataReader reader, ILogger logger, out ArcServeFileDefinition definition) {
             definition = new ArcServeFileDefinition();
             definition.RelativeFilePath = reader.ReadFixedSizeString(250);
             definition.UnknownString1 = reader.ReadFixedSizeString(33);
@@ -36,27 +37,37 @@ namespace OnStreamSCArcServeExtractor
 
             definition.LastModificationTime = ParseTimeStamp(lastModificationTimestamp);
             definition.FileCreationTime = ParseTimeStamp(fileCreationTimestamp);
-            
+
             // Read data chunks.
             long sectionReadStart = reader.Index;
             List<ArcServeStreamData> streamChunks = definition.StreamChunks = new List<ArcServeStreamData>();
 
-            long lastChunkDataStart = sectionReadStart;
-            try {
-                ArcServeStreamData streamData;
-                while ((streamData = ParseSection(reader, logger)) is not ArcServeStreamEndData)
-                {
-                    if (streamData is ArcServeStreamWindowsFileName fileNamePacket)
-                        definition.FileDeclaration = fileNamePacket;
-                    if (streamData is ArcServeStreamFullPathData fullPathPacket)
-                        definition.FullPathData = fullPathPacket;
+            if ((header.Flags & ArcServeSessionFlags.Compressed) == ArcServeSessionFlags.Compressed) {
+                long lastChunkDataStart = sectionReadStart;
+                try {
+                    ArcServeStreamData streamData;
+                    while ((streamData = ParseSection(reader, logger)) is not ArcServeStreamEndData) {
+                        if (streamData is ArcServeStreamWindowsFileName fileNamePacket)
+                            definition.FileDeclaration = fileNamePacket;
+                        if (streamData is ArcServeStreamFullPathData fullPathPacket)
+                            definition.FullPathData = fullPathPacket;
 
-                    streamChunks.Add(streamData);
-                    lastChunkDataStart = reader.Index;
-
+                        streamChunks.Add(streamData);
+                        lastChunkDataStart = reader.Index;
+                    }
+                } catch (Exception ex) {
+                    logger.LogTrace(ex, "Failed when parsing stream chunk at {lastChunkDataStart}", reader.GetFileIndexDisplay(lastChunkDataStart));
                 }
-            } catch (Exception ex) {
-                logger.LogTrace(ex, "Failed when parsing stream chunk at {lastChunkDataStart}", reader.GetFileIndexDisplay(lastChunkDataStart));
+            } else {
+                ArcServeStreamHeader streamChunkHeader = new ArcServeStreamHeader
+                    {
+                        Size = definition.FileSizeInBytes,
+                        Name = definition.RelativeFilePath
+                    };
+                
+                ArcServeStreamRawData rawData = new ();
+                rawData.LoadFromReader(reader, in streamChunkHeader);
+                streamChunks.Add(rawData);
             }
 
             if (!definition.IsDirectory && !definition.IsFile)

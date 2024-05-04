@@ -48,6 +48,18 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="tape">The configuration for the tape dump file(s).</param>
         /// <param name="logger">The logger to write output to.</param>
         public static void ExtractFilesFromTapeDumps(TapeDefinition tape, ILogger logger) {
+            // Raw tapes don't have ordering information. We're relying on the user to have specified the tapes in the correct order.
+            if (!tape.HasOnStreamAuxData)
+            {
+                if (tape.Entries.Count != 1)
+                    throw new Exception($"Unexpected number of tape file entries {tape.Entries.Count}");
+                    
+                // TODO: Create a reader which will read in the desired order.
+                using DataReader rawReader = new DataReader(tape.Entries[0].RawStream);
+                ExtractFilesFromTapeDumps(tape, logger, rawReader);
+                return;
+            }
+            
             // Generate mapping:
             Dictionary<uint, OnStreamTapeBlock> blockMapping = OnStreamBlockMapping.GetBlockMapping(tape, logger);
             OnStreamGapFinder.FindAndLogGaps(tape.Type, blockMapping, logger);
@@ -56,6 +68,18 @@ namespace OnStreamSCArcServeExtractor
             Image image = TapeImageCreator.CreateImage(tape.Type, blockMapping);
             image.Save(Path.Combine(tape.FolderPath, "tape-damage.png"), ImageFormat.Png);
 
+            // Setup reader
+            using DataReader reader = new DataReader(new OnStreamInterwovenStream(tape.CreatePhysicallyOrderedBlockList(blockMapping)));
+            ExtractFilesFromTapeDumps(tape, logger, reader);
+        }
+
+        /// <summary>
+        /// Extracts files from the tape dumps configured with <see cref="tape"/>.
+        /// </summary>
+        /// <param name="tape">The configuration for the tape dump file(s).</param>
+        /// <param name="logger">The logger to write output to.</param>
+        /// <param name="reader">The source of tape dump data</param>
+        public static void ExtractFilesFromTapeDumps(TapeDefinition tape, ILogger logger, DataReader reader) {
             // Setup zip file.
             string zipFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + ".zip");
             if (File.Exists(zipFilePath))
@@ -65,12 +89,13 @@ namespace OnStreamSCArcServeExtractor
 
             // Start reading all the files.
             long invalidSectionCount = 0;
+            ArcServeSessionHeader sessionHeader = default;
             while (reader.HasMore) {
                 long preReadIndex = reader.Index;
                 uint magic = reader.ReadUInt32();
                 
                 try {
-                    if (!TryReadSection(magic, reader, tapeData, logger, ref invalidSectionCount))
+                    if (!TryReadSection(magic, reader, tapeData, logger, ref invalidSectionCount, ref sessionHeader))
                         invalidSectionCount++;
                 } catch (Exception ex) {
                     invalidSectionCount++;
@@ -94,33 +119,37 @@ namespace OnStreamSCArcServeExtractor
             ArcServeCatalogueFile.FindMissingFilesFromZipFile(readZipFile, logger);
         }
 
-        private static bool TryReadSection(uint magic, DataReader reader, TapeDumpData dumpData, ILogger logger, ref long skipCount) {
+        private static bool TryReadSection(uint magic, DataReader reader, TapeDumpData dumpData, ILogger logger, ref long skipCount, ref ArcServeSessionHeader sessionHeader) {
             if (magic == 0x00000000U) {
                 // Do nothing, empty sector.
             } else if (Enum.IsDefined(typeof(ArcServeSessionHeaderSignature), magic)) { // Tape header.
                 ShowSkippedCount(logger, ref skipCount);
                 ArcServeSessionHeaderSignature signature = (ArcServeSessionHeaderSignature) magic;
-                ArcServeSessionHeader.ReadSessionHeader(reader, signature, out ArcServeSessionHeader header);
-                if (ArcServe.IsValidLookingString(header.RootDirectoryPath))
-                    dumpData.CurrentBasePath = header.RootDirectoryPath;
+                ArcServeSessionHeader.ReadSessionHeader(reader, signature, out sessionHeader);
+                if (ArcServe.IsValidLookingString(sessionHeader.RootDirectoryPath))
+                    dumpData.CurrentBasePath = sessionHeader.RootDirectoryPath;
 
                 logger.LogInformation("");
-                header.PrintSessionHeaderInformation(logger);
+                sessionHeader.PrintSessionHeaderInformation(logger);
                 logger.LogInformation("");
             } else if (magic == 0xCCCCCCCCU) { // File ending.
                 ShowSkippedCount(logger, ref skipCount);
                 string dosPath = reader.ReadFixedSizeString(246);
                 uint crcHash = reader.ReadUInt32();
                 reader.SkipBytes(258);
-                if (!ArcServe.IsValidLookingString(dosPath))
+                if (!ArcServe.IsValidLookingString(dosPath) && !(sessionHeader.Signature == ArcServeSessionHeaderSignature.Signature386 && string.IsNullOrEmpty(dosPath)))
                     return false;
 
-                logger.LogInformation($" - Reached End of File: {dosPath}, Hash: {crcHash}");
+                if (crcHash != 0 || !string.IsNullOrEmpty(dosPath)) {
+                    logger.LogInformation(" - Reached End of File: {dosPath}, Hash: {crcHash}", dosPath, crcHash);
+                } else {
+                    logger.LogInformation(" - Reached End of File");
+                }
 
                 // TODO: If this is a file (not a directory), check CRC hash matches. (Unless CRC hash is zero..?)
-            } else if (magic == 0xABBAABBAU || magic == 0xBBBBBBBBU) {
+            } else if (magic == 0xABBAABBAU || magic == 0xBBBBBBBBU || magic == 0x55555557U) {
                 ShowSkippedCount(logger, ref skipCount);
-                return TryReadFileContents(reader, dumpData, logger);
+                return TryReadFileContents(in sessionHeader, reader, dumpData, logger);
             } else {
                 return false;
             }
@@ -136,9 +165,9 @@ namespace OnStreamSCArcServeExtractor
             skipCount = 0;
         }
 
-        private static bool TryReadFileContents(DataReader reader, TapeDumpData data, ILogger logger) {
+        private static bool TryReadFileContents(in ArcServeSessionHeader header, DataReader reader, TapeDumpData data, ILogger logger) {
             OnStreamTapeBlock? currentTapeBlock = data.Config.HasOnStreamAuxData ? reader.GetCurrentTapeBlock() : null;
-            ArcServe.ReadFileEntry(reader, logger, out ArcServeFileDefinition fileDefinition);
+            ArcServe.ReadFileEntry(in header, reader, logger, out ArcServeFileDefinition fileDefinition);
 
             string fullFilePath = fileDefinition.FullPath;
             string? basePath = data.CurrentBasePath;

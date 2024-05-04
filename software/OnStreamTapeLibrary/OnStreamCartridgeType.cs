@@ -10,6 +10,8 @@ namespace OnStreamTapeLibrary
     /// </summary>
     public enum OnStreamCartridgeType
     {
+        Raw, // Represents a tape dump which has no OnStream data chunk. (Eg: A pure data stream)
+        
         Adr30, // Generation 1, 15GB Physical Capacity. (30GB Compressed, assuming 2:1 compression ratio)
         Adr50, // Generation 1, 25GB Physical Capacity. (50GB Compressed, assuming 2:1 compression ratio)
         
@@ -76,6 +78,7 @@ namespace OnStreamTapeLibrary
         /// <returns>logicalBlockCount</returns>
         public static bool HasParkingZone(this OnStreamCartridgeType type) {
             return type switch {
+                OnStreamCartridgeType.Raw => false,
                 OnStreamCartridgeType.Adr30 => false,
                 OnStreamCartridgeType.Adr50 => true,
                 _ => throw new OnStreamCartridgeTypeException(type, "Don't know if a parking zone exists")
