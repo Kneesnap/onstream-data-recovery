@@ -70,7 +70,8 @@ namespace OnStreamSCArcServeExtractor
                 uint magic = reader.ReadUInt32();
                 
                 try {
-                    _ = TryReadSection(magic, reader, tapeData, logger, ref invalidSectionCount);
+                    if (!TryReadSection(magic, reader, tapeData, logger, ref invalidSectionCount))
+                        invalidSectionCount++;
                 } catch (Exception ex) {
                     invalidSectionCount++;
                     logger.LogError("{error}", ex.ToString());
@@ -111,10 +112,8 @@ namespace OnStreamSCArcServeExtractor
                 string dosPath = reader.ReadFixedSizeString(246);
                 uint crcHash = reader.ReadUInt32();
                 reader.SkipBytes(258);
-                if (!ArcServe.IsValidLookingString(dosPath)) {
-                    skipCount++;
+                if (!ArcServe.IsValidLookingString(dosPath))
                     return false;
-                }
 
                 logger.LogInformation($" - Reached End of File: {dosPath}, Hash: {crcHash}");
 
@@ -123,7 +122,6 @@ namespace OnStreamSCArcServeExtractor
                 ShowSkippedCount(logger, ref skipCount);
                 return TryReadFileContents(reader, dumpData, logger);
             } else {
-                skipCount++;
                 return false;
             }
 
@@ -146,6 +144,9 @@ namespace OnStreamSCArcServeExtractor
             string? basePath = data.CurrentBasePath;
             if (basePath != null)
                 fullFilePath = basePath + (basePath.EndsWith("\\", StringComparison.InvariantCulture) ? string.Empty : "\\") + fullFilePath;
+
+            if (!ArcServe.IsValidLookingString(fullFilePath))
+                return false;
 
             // Log info.
             logger.LogInformation($"Found: {fullFilePath}, {DataUtils.ConvertByteCountToFileSize(fileDefinition.FileSizeInBytes)}"

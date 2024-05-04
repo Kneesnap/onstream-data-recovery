@@ -181,7 +181,7 @@ namespace OnStreamSCArcServeExtractor
             int validLooking = 0;
             for (int i = 0; i < input.Length; i++) {
                 char temp = input[i];
-                if ((temp >= 'a' && temp <= 'z') || (temp >= 'A' && temp <= 'Z') || (temp >= '0' && temp <= '9') || temp == '\\' || temp == '_' || temp == '.' || temp == '~' || temp == '-')
+                if ((temp >= 'a' && temp <= 'z') || (temp >= 'A' && temp <= 'Z') || (temp >= '0' && temp <= '9') || temp == '\\' || temp == '_' || temp == '.' || temp == '~' || temp == '-' || temp == '/')
                     validLooking++;
             }
 
