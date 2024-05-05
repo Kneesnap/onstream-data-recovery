@@ -9,8 +9,6 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
-using ModToolFramework.Utils;
-using OnStreamSCArcServeExtractor.Packets;
 
 namespace OnStreamSCArcServeExtractor
 {
@@ -79,22 +77,21 @@ namespace OnStreamSCArcServeExtractor
             ArcServeTapeArchive tapeArchive = new (tape, logger, zipArchive);
 
             // Start reading all the files.
-            long invalidPacketCount = 0;
-            ArcServeSessionHeader? sessionHeader = default;
+            ArcServeFilePacketReader filePacketReader = new (tapeArchive, reader);
             while (reader.HasMore) {
                 long preReadIndex = reader.Index;
                 uint packetSignature = reader.ReadUInt32();
                 
                 try {
-                    if (!TryReadPacket(tapeArchive, reader, packetSignature, ref invalidPacketCount, ref sessionHeader))
-                        invalidPacketCount++;
+                    if (!filePacketReader.TryReadPacket(packetSignature))
+                        filePacketReader.MarkSkippedSector(packetSignature);
                 } catch (Exception ex) {
-                    invalidPacketCount++;
+                    filePacketReader.MarkSkippedSector(packetSignature);
                     logger.LogTrace(ex, "Encountered an error while reading the data for packet {packetSignature:X8} at {currIndex}. (Start: {preReadIndex})", packetSignature, reader.GetFileIndexDisplay(), reader.GetFileIndexDisplay(preReadIndex));
                 }
 
                 if (tape.HasOnStreamAuxData && reader.WasMissingDataSkipped(preReadIndex, true, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock)) {
-                    logger.LogError(" - Skipped {blocksSkipped} missing tape block(s) from after {lastValidPhysicalBlock:X8}/{lastValidBlock}.", blocksSkipped, lastValidBlock.PhysicalBlock, lastValidBlock.LogicalBlockString);
+                    logger.LogError(" - Skipped {blocksSkipped} missing tape block(s) from after {lastValidPhysicalBlock:X8}/{lastValidBlock}. (OnStream Specific)", blocksSkipped, lastValidBlock.PhysicalBlock, lastValidBlock.LogicalBlockString);
                 }
 
                 reader.Align(ArcServe.RootSectorSize);
@@ -110,52 +107,6 @@ namespace OnStreamSCArcServeExtractor
             return tapeArchive;
         }
 
-        private static bool TryReadPacket(ArcServeTapeArchive tapeArchive, DataReader reader, uint packetSignature, ref long skipCount, ref ArcServeSessionHeader? sessionHeader) {
-            if (packetSignature == 0)
-                return true; // We don't load a packet, but we also don't consider this a failure. We're just going to let it skip ahead.
-            
-            ArcServeFilePacket? newPacket = ArcServeFilePacket.CreateFilePacketFromSignature(tapeArchive, sessionHeader, packetSignature);
-            if (newPacket == null)
-                return false; // Signature wasn't a recognized packet.
-            
-            ShowSkippedCount(tapeArchive.Logger, ref skipCount);
-            tapeArchive.OrderedPackets.Add(newPacket);
-            long packetReadStartIndex = reader.Index;
-            try {
-                newPacket.LoadFromReader(reader); // Load from the reader.
-            } catch {
-                newPacket.EncounteredErrorWhileLoading = true;
-                
-                // Ensure we can see what actually caused the error.
-                if (newPacket.AppearsValid) {
-                    newPacket.WriteInformation();
-                } else {
-                    // Avoid printing garbage text characters if we can avoid it. It's not a huge deal but it can be annoying.
-                    tapeArchive.Logger.LogError("Failed to read packet of type {packetType} from {startIndex}. (The data was too broken to display)", newPacket.GetTypeDisplayName(), reader.GetFileIndexDisplay(packetReadStartIndex));
-                }
-                throw;
-            }
-
-            // If the packet looks like a valid packet, handle it.
-            bool loadSuccess = false;
-            if (newPacket.AppearsValid) {
-                newPacket.WriteInformation();
-                loadSuccess = newPacket.Process(reader);
-                if (loadSuccess && newPacket is ArcServeSessionHeader sessionHeaderPacket)
-                    sessionHeader = sessionHeaderPacket;
-            }
-
-            return loadSuccess;
-        }
-
-        private static void ShowSkippedCount(ILogger logger, ref long skipCount) {
-            if (skipCount <= 0)
-                return;
-
-            logger.LogWarning("Skipped {skipCount} packet section(s) which did not appear to be valid.", skipCount);
-            skipCount = 0;
-        }
-        
         /// <summary>
         /// Attempt to open a zip file which has already been extracted.
         /// </summary>
