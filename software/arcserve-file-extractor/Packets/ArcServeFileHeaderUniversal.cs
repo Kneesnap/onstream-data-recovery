@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils.Data;
+using OnStreamSCArcServeExtractor.UniversalStream;
 using OnStreamTapeLibrary;
 
 namespace OnStreamSCArcServeExtractor.Packets
@@ -12,19 +13,52 @@ namespace OnStreamSCArcServeExtractor.Packets
     /// Represents a universal file entry.
     /// Seems to be the most common file entry type.
     /// Seen in Frogger EOP, Chicken Run EOP Tape #2, and very briefly in Andrew Borman's tape.
-    /// TODO: File name chunks should impact the file name in the original.
-    /// TODO: Redo our logic for managing sections too.
     /// </summary>
     public class ArcServeFileHeaderUniversal : ArcServeFileHeader
     {
+        public List<ArcServeStreamData>? CachedDataChunkStream { get; private set; }
         public ArcServeStreamWindowsFileName? FileDeclaration { get; private set; }
         public ArcServeStreamFullPathData? FullPathData { get; private set; }
         public override bool IsDirectory => base.IsDirectory || (this.FileDeclaration != null && this.FileDeclaration.Block.Type == (uint) ArcServeStreamType.Directory);
+        public override string RelativeFilePath => this.FullPathData?.FullPath ?? base.RelativeFilePath;
         
         public ArcServeFileHeaderUniversal(ArcServeSessionHeader sessionHeader) : base(sessionHeader, ArcServeFileHeaderSignature.Universal)
         {
         }
-        
+
+        /// <inheritdoc cref="ArcServeFilePacket.LoadFromReader"/>
+        public override void LoadFromReader(DataReader reader)
+        {
+            base.LoadFromReader(reader);
+
+            // Read chunks excluding file data, since that will be parsed later.
+            this.CachedDataChunkStream ??= new List<ArcServeStreamData>();
+            while (reader.HasMore) {
+                long headerStartIndex = reader.Index;
+                bool readHeader = ArcServeStreamPacket.TryParseStreamHeader(reader, out _, out ArcServeStreamHeader streamHeader);
+
+                // Attempt to read the stream packet. If it fails, we're done.
+                if (readHeader && ((streamHeader.Id == 0x2110DAAD) || (streamHeader.Id == 0x1000DAAD && streamHeader.Type == 0x1900DADA) || (streamHeader.Id == 0x2310DAAD))) {
+                    try {
+                        ArcServeStreamData streamPacket = ArcServeStreamPacket.ReadStreamPacketWithHeader(reader, this.Logger, headerStartIndex, in streamHeader);
+                        if (streamPacket is ArcServeStreamWindowsFileName fileNamePacket)
+                            this.FileDeclaration = fileNamePacket;
+                        if (streamPacket is ArcServeStreamFullPathData fullPathPacket)
+                            this.FullPathData = fullPathPacket;
+                        
+                        this.CachedDataChunkStream.Add(streamPacket);
+                        continue; // Ensure the loop continues.
+                    } catch {
+                        // If it fails, this will be read again later, it should be safe to silently fail.
+                    }
+                }
+                
+                // Restore the reader to before the start index.
+                reader.Index = headerStartIndex;
+                break;
+            }
+        }
+
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {
@@ -51,9 +85,6 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <param name="storeInCache">If true, the chunks will be saved in a cache.</param>
         /// <returns>dataChunks</returns>
         public IEnumerable<ArcServeStreamData> ReadDataChunksFromReader(DataReader reader, bool storeInCache = false) {
-            if (this.CachedDataChunkStream != null)
-                throw new ApplicationException("The data chunks have already been read, so the cache should be used instead.");
-
             // Create the cache.
             if (storeInCache)
                 this.CachedDataChunkStream = new List<ArcServeStreamData>();
@@ -63,12 +94,8 @@ namespace OnStreamSCArcServeExtractor.Packets
             long lastChunkStartIndex = dataStreamStartIndex;
             ArcServeStreamData streamData;
             while ((streamData = ParseSectionSafe(reader, lastChunkStartIndex)) is not ArcServeStreamEndData) {
-                if (streamData is ArcServeStreamWindowsFileName fileNamePacket)
-                    this.FileDeclaration = fileNamePacket;
-                if (streamData is ArcServeStreamFullPathData fullPathPacket)
-                    this.FullPathData = fullPathPacket;
-
-                this.CachedDataChunkStream?.Add(streamData);
+                if (storeInCache) 
+                    this.CachedDataChunkStream?.Add(streamData);
                 lastChunkStartIndex = reader.Index;
                 yield return streamData;
             }
@@ -80,7 +107,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <returns></returns>
         private ArcServeStreamData ParseSectionSafe(DataReader reader, long lastChunkStartIndex) {
             try {
-                return ArcServe.ParseSection(reader, this.Logger);
+                return ArcServeStreamPacket.ReadStreamPacket(reader, this.Logger);
             } catch (Exception ex) {
                 throw new DataException($"Failed when parsing stream chunk at {reader.GetFileIndexDisplay(lastChunkStartIndex)}", ex);
             }

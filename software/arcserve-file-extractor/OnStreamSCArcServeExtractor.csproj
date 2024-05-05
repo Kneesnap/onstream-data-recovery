@@ -26,4 +26,8 @@
         <PackageReference Include="MSTest.TestFramework" Version="2.1.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="UniversalStream\Packets" />
+    </ItemGroup>
+
 </Project>

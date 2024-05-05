@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -31,7 +30,6 @@ namespace OnStreamSCArcServeExtractor.Packets
         public uint DirectorySpaceRestriction { get; private set; }
         public DateOnly SharedLastAccessDate { get; private set; }
         public DateTime SharedFileCreationTime { get; private set; }
-        public List<ArcServeStreamData>? CachedDataChunkStream { get; protected set; }
 
         // Metadata.
         public string? FormattedReaderStartIndex { get; private set; }

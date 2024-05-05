@@ -1,8 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-using ModToolFramework.Utils;
-using ModToolFramework.Utils.Data;
-using OnStreamTapeLibrary;
-using System;
+﻿using System;
 using System.Globalization;
 
 namespace OnStreamSCArcServeExtractor
@@ -12,7 +8,6 @@ namespace OnStreamSCArcServeExtractor
     /// </summary>
     public static class ArcServe
     {
-        public const uint StreamStartSignature = 0xCAACCAACU;
         public const int RootSectorSize = 0x200;
         public const bool FastDebuggingEnabled = false;
         private static readonly Calendar ArcServeCalendar = Calendar.ReadOnly(new GregorianCalendar());
@@ -51,101 +46,7 @@ namespace OnStreamSCArcServeExtractor
             int year = startYear + ((number >> 9) & 0x7F); // 7 bits
             return new DateOnly(year, month, day, ArcServeCalendar);
         }
-        
-        /// <summary>
-        /// Reads an ArcServe data stream header from the reader, if possible.
-        /// </summary>
-        /// <param name="reader">The reader to read data from.</param>
-        /// <param name="block">Output storage for the block header.</param>
-        /// <returns>Whether a stream header was found/parsed.</returns>
-        public static bool TryParseStreamHeader(DataReader reader, out ArcServeStreamHeader block) {
-            long readerStartIndex = reader.Index;
-            uint magicSignature = reader.ReadUInt32(ByteEndian.BigEndian);
 
-            block = new ArcServeStreamHeader();
-            if (magicSignature != StreamStartSignature) {
-                block.Id = magicSignature;
-                reader.Index = readerStartIndex;
-                return false;
-            }
-
-            block = new ArcServeStreamHeader();
-            block.Id = reader.ReadUInt32(ByteEndian.BigEndian);
-            block.FileSystem = reader.ReadEnum<uint, StreamFileSystem>();
-            block.Size = reader.ReadUInt64();
-            block.NameSize = reader.ReadUInt32();
-            block.Type = reader.ReadUInt32(ByteEndian.BigEndian);
-            block.RawFlags = reader.ReadUInt32();
-
-            if (block.NameSize > 0) {
-                block.Name = reader.ReadStringBytes((int) block.NameSize - 1);
-                reader.SkipBytesRequireEmpty(1);
-            } else {
-                block.Name = string.Empty;
-            }
-
-            return true;
-        }
-        
-        /// <summary>
-        /// Parses the next stream section (header + data) and requires that it is a certain type.
-        /// If it is not of the correct type, or no stream could be read, an exception will be thrown.
-        /// </summary>
-        /// <param name="reader">The source to read data from.</param>
-        /// <param name="logger">The logger to log information to.</param>
-        /// <typeparam name="TStreamData">The type of stream section which is required.</typeparam>
-        /// <returns>section</returns>
-        /// <exception cref="InvalidCastException">Thrown if the wrong section was found.</exception>
-        public static TStreamData RequireSection<TStreamData>(DataReader reader, ILogger logger) where TStreamData : ArcServeStreamData, new() {
-            long startReadIndex = reader.Index;
-            ArcServeStreamData data = ParseSection(reader, logger);
-            if (data is TStreamData typedData)
-                return typedData;
-
-            throw new InvalidCastException($"Expected an {typeof(TStreamData).GetDisplayName()} section at {reader.GetFileIndexDisplay(startReadIndex)}, but got {data.GetTypeDisplayName()}/{data.Block} section instead.");
-        }
-
-        /// <summary>
-        /// Parses the next available data as a stream section, parsing both the header and the data.
-        /// </summary>
-        /// <param name="reader">The reader to read from.</param>
-        /// <param name="logger">The logger to write information to.</param>
-        /// <returns>parsed stream section</returns>
-        /// <exception cref="Exception">Thrown if there was no stream to read, or if there was an error reading the stream.</exception>
-        public static ArcServeStreamData ParseSection(DataReader reader, ILogger logger) {
-            long sectionStartIndex = reader.Index;
-
-            if (!TryParseStreamHeader(reader, out ArcServeStreamHeader block))
-                throw new Exception($"Tried to read section from {reader.GetFileIndexDisplay(sectionStartIndex)}, but we found {block.Id:X8} instead of the expected signature {StreamStartSignature:X8}.");
-
-            long streamDataStartIndex = reader.Index;
-            ArcServeStreamData packet = ArcServeStreamDataTypes.CreatePacket(in block);
-            packet.LoadFromReader(reader, in block);
-            long streamDataEndIndex = reader.Index;
-            long readStreamDataSize = (streamDataEndIndex - streamDataStartIndex);
-
-            // Verify correct amount was read.
-            if (unchecked((ulong)readStreamDataSize) != block.Size)
-                logger.LogWarning(" - Section @ {sectionStartIndex} had a length of {blockSize} bytes, but {readStreamDataSize} were read.", reader.GetFileIndexDisplay(sectionStartIndex), block.Size, readStreamDataSize);
-
-            AlignReaderToStream(reader); // Align the reader.
-            logger.LogDebug(" - Parsed ArcServe Section {section}/{header} at {address}. (Header End: {streamDataStart}, Data End : {alignedDataEndIndex})", packet.GetTypeDisplayName(), block, reader.GetFileIndexDisplay(sectionStartIndex), reader.GetFileIndexDisplay(streamDataStartIndex), reader.GetFileIndexDisplay());
-            return packet;
-        }
-
-        /// <summary>
-        /// Aligns the reader to the next position which a stream section may be.
-        /// </summary>
-        /// <param name="reader">The reader to align.</param>
-        public static void AlignReaderToStream(DataReader reader) {
-            // Align to the next available 3rd byte, for some reason...
-            // If for some reason this stops working at some point, the reason it has failed is probably that it was wrong to assume it was the 3rd byte it should be aligned to.
-            // In that situation, it should probably be aligned to the same alignment as the previous stream section header.
-            
-            int remainder = (int)(reader.Index % 4);
-            reader.SkipBytes(3 - remainder);
-        }
-        
         /// <summary>
         /// Test if the provided string looks valid and is probably not garbage data we read.
         /// </summary>
