@@ -48,7 +48,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         public new ArcServeFileHeaderSignature Signature => (ArcServeFileHeaderSignature) base.Signature;
         public virtual bool IsFile => !this.IsDirectory;
         public virtual bool IsDirectory => (this.Attributes & 0x10) == 0x10;
-        public override bool AppearsValid => ArcServe.IsValidLookingString(this.FullFilePath) || string.IsNullOrEmpty(this.FullFilePath);
+        public override bool AppearsValid => ArcServe.IsValidLookingString(this.FullFilePath, true);
 
         public string FullFilePath
         {

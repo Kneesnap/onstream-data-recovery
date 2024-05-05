@@ -46,7 +46,8 @@ namespace OnStreamSCArcServeExtractor.Packets
         
         // Getters:
         public new ArcServeSessionHeaderSignature Signature => (ArcServeSessionHeaderSignature) base.Signature;
-        public override bool AppearsValid => true; // If it passed the strict parsing logic, it's probably valid.
+        public override bool AppearsValid => !this.EncounteredErrorWhileLoading && ArcServe.IsValidLookingString(this.RootDirectoryPath, true) 
+            && ArcServe.IsValidLookingString(this.UserName, true) && ArcServe.IsValidLookingString(this.Description, true); // If it passed the strict parsing logic, it's probably valid.
 
         /// <summary>
         /// Creates a new <see cref="ArcServeSessionHeader"/> with the given signature.

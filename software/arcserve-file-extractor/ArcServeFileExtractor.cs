@@ -124,6 +124,8 @@ namespace OnStreamSCArcServeExtractor
             try {
                 newPacket.LoadFromReader(reader); // Load from the reader.
             } catch {
+                newPacket.EncounteredErrorWhileLoading = true;
+                
                 // Ensure we can see what actually caused the error.
                 if (newPacket.AppearsValid) {
                     newPacket.WriteInformation();

@@ -24,6 +24,11 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// Returns whether or not the data read for this packet appears to be an intended occurrence of the packet, or if the signature was seen by coincidence in data which was not supposed to be a packet.
         /// </summary>
         public abstract bool AppearsValid { get; }
+        
+        /// <summary>
+        /// If there was an error encountered while loading the packet.
+        /// </summary>
+        public bool EncounteredErrorWhileLoading { get; set; }
 
         /// <summary>
         /// The logger which can be used to write information.

@@ -150,10 +150,11 @@ namespace OnStreamSCArcServeExtractor
         /// Test if the provided string looks valid and is probably not garbage data we read.
         /// </summary>
         /// <param name="input">The string to test.</param>
+        /// <param name="allowEmpty">If the string is empty, this will be what the function returns.</param>
         /// <returns>Whether it looks valid</returns>
-        public static bool IsValidLookingString(string? input) {
+        public static bool IsValidLookingString(string? input, bool allowEmpty = false) {
             if (string.IsNullOrWhiteSpace(input))
-                return false;
+                return allowEmpty;
             
             int validLooking = 0;
             for (int i = 0; i < input.Length; i++) {
