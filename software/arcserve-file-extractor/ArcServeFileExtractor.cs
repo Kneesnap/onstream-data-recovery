@@ -9,6 +9,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using ModToolFramework.Utils;
 using OnStreamSCArcServeExtractor.Packets;
 
 namespace OnStreamSCArcServeExtractor
@@ -119,11 +120,17 @@ namespace OnStreamSCArcServeExtractor
             
             ShowSkippedCount(tapeArchive.Logger, ref skipCount);
             tapeArchive.OrderedPackets.Add(newPacket);
+            long packetReadStartIndex = reader.Index;
             try {
                 newPacket.LoadFromReader(reader); // Load from the reader.
             } catch {
                 // Ensure we can see what actually caused the error.
-                newPacket.WriteInformation();
+                if (newPacket.AppearsValid) {
+                    newPacket.WriteInformation();
+                } else {
+                    // Avoid printing garbage text characters if we can avoid it. It's not a huge deal but it can be annoying.
+                    tapeArchive.Logger.LogError("Failed to read packet of type {packetType} from {startIndex}. (The data was too broken to display)", newPacket.GetTypeDisplayName(), reader.GetFileIndexDisplay(packetReadStartIndex));
+                }
                 throw;
             }
 

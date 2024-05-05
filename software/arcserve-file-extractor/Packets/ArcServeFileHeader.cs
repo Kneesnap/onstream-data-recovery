@@ -214,27 +214,26 @@ namespace OnStreamSCArcServeExtractor.Packets
                 builder.AppendFormat(", Block: {0}/{1:X8}", this.CachedStartingTapeBlockPosition.LogicalBlockString, this.CachedStartingTapeBlockPosition.PhysicalBlock);
             
             // Dates.
-            builder.Append(" | Creation: ");
+            builder.Append(" | Created: ");
             builder.Append(this.FileCreationTime);
-            builder.Append(", Last Modification: ");
+            builder.Append(", Modified: ");
             builder.Append(this.LastModificationTime);
-            builder.Append(", Last Access: ");
+            builder.Append(", Accessed: ");
             builder.Append(this.LastAccessDate);
 
             // Misc
-            builder.Append(" ||");
             if (this.Attributes != 0)
-                builder.AppendFormat(" Attributes: {0:X}", this.Attributes);
+                builder.AppendFormat(", Attributes: {0:X}", this.Attributes);
             if (this.OwnerId != 0)
-                builder.AppendFormat(" Owner ID: {0}", this.OwnerId);
+                builder.AppendFormat(", Owner ID: {0}", this.OwnerId);
             if (this.Mask != 0 && this.Mask != 0xFFFF)
-                builder.AppendFormat(" Mask: {0:X4}", this.Mask);
+                builder.AppendFormat(", Mask: {0:X4}", this.Mask);
             if (this.DirectoryLevel != 0xFF)
-                builder.AppendFormat(" Directory Level: {0:X2}", this.DirectoryLevel);
+                builder.AppendFormat(", Directory Level: {0:X2}", this.DirectoryLevel);
             if (this.DirectorySpaceRestriction != 0)
-                builder.AppendFormat(" Directory Space Restriction: {0}", this.DirectorySpaceRestriction);
+                builder.AppendFormat(", Directory Space Restriction: {0}", this.DirectorySpaceRestriction);
             if (this.TrusteeLength != 0)
-                builder.AppendFormat(" Trustee Length: {0}", this.TrusteeLength);
+                builder.AppendFormat(", Trustee Length: {0}", this.TrusteeLength);
         }
     }
 

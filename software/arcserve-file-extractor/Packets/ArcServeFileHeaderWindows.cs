@@ -60,11 +60,11 @@ namespace OnStreamSCArcServeExtractor.Packets
         {
             base.PrintSessionHeaderInformation(builder);
             if (this.Attributes != this.FileAttributes)
-                builder.AppendFormat(" WinAttributes: {0:X}", this.FileAttributes);
+                builder.AppendFormat(", WinAttributes: {0:X}", this.FileAttributes);
             if (this.Unknown0 != 0)
-                builder.AppendFormat(" WinUnknown0: {0:X}", this.Unknown0);
+                builder.AppendFormat(", WinUnknown0: {0:X}", this.Unknown0);
             if (this.Unknown1 != 0)
-                builder.AppendFormat(" WinUnknown1: {0:X}", this.Unknown1);
+                builder.AppendFormat(", WinUnknown1: {0:X}", this.Unknown1);
         }
         
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>

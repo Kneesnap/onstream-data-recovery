@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
-using ModToolFramework.Utils.Data;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace OnStreamTapeLibrary
 {
@@ -14,6 +14,7 @@ namespace OnStreamTapeLibrary
     {
         private readonly object _lock = new object();
         private bool _disposed;
+        private volatile Task _currentTask = Task.CompletedTask;
 
         /// <inheritdoc cref="ILogger.BeginScope{TState}"/>
         public IDisposable BeginScope<TState>(TState state) where TState : notnull {
@@ -50,7 +51,7 @@ namespace OnStreamTapeLibrary
         /// </summary>
         /// <param name="message"></param>
         protected virtual void LogFinalMessage(string message) {
-            Console.WriteLine(message);
+            this._currentTask = this._currentTask.ContinueWith(_ => Console.Out.WriteLineAsync(message));
         }
         
         /// <summary>
@@ -74,20 +75,19 @@ namespace OnStreamTapeLibrary
     /// </summary>
     public class FileLogger : SimpleLogger
     {
-        private readonly DataWriter _writer;
+        private readonly StreamWriter _writer;
 
         public FileLogger(string path, bool overwriteIfExists = false) {
             if (overwriteIfExists && File.Exists(path))
                 File.Delete(path);
 
             FileMode mode = overwriteIfExists ? FileMode.Create : FileMode.Append;
-            this._writer = new DataWriter(new BufferedStream(new FileStream(path, mode, FileAccess.Write)));
+            this._writer = new StreamWriter(new BufferedStream(new FileStream(path, mode, FileAccess.Write)), Encoding.UTF8);
         }
 
         /// <inheritdoc cref="SimpleLogger.LogFinalMessage"/>
         protected override void LogFinalMessage(string message) {
-            this._writer.WriteStringBytes(message, Encoding.UTF8);
-            this._writer.Write('\n');
+            this._writer.WriteLine(message);
             base.LogFinalMessage(message);
         }
         

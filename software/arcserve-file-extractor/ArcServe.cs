@@ -126,7 +126,7 @@ namespace OnStreamSCArcServeExtractor
 
             // Verify correct amount was read.
             if (unchecked((ulong)readStreamDataSize) != block.Size)
-                logger.LogWarning($"$ - Section @ {reader.GetFileIndexDisplay(sectionStartIndex)} had a length of {block.Size} bytes, but {readStreamDataSize} were read.");
+                logger.LogWarning(" - Section @ {sectionStartIndex} had a length of {blockSize} bytes, but {readStreamDataSize} were read.", reader.GetFileIndexDisplay(sectionStartIndex), block.Size, readStreamDataSize);
 
             AlignReaderToStream(reader); // Align the reader.
             logger.LogDebug(" - Parsed ArcServe Section {section}/{header} at {address}. (Header End: {streamDataStart}, Data End : {alignedDataEndIndex})", packet.GetTypeDisplayName(), block, reader.GetFileIndexDisplay(sectionStartIndex), reader.GetFileIndexDisplay(streamDataStartIndex), reader.GetFileIndexDisplay());
