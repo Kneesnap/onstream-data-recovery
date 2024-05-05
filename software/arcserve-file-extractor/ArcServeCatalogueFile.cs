@@ -1,12 +1,12 @@
 ﻿using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
-using OnStreamTapeLibrary;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.IO.Compression;
+using OnStreamSCArcServeExtractor.Packets;
 
 namespace OnStreamSCArcServeExtractor
 {
@@ -15,23 +15,26 @@ namespace OnStreamSCArcServeExtractor
     /// </summary>
     public class ArcServeCatalogueFile
     {
-        public readonly List<ArcServeCatalogueFileEntry> Entries = new List<ArcServeCatalogueFileEntry>();
-        public ArcServeSessionHeader SessionHeader;
+        public readonly List<ArcServeCatalogueFileEntry> Entries = new ();
+        public readonly ArcServeSessionHeader SessionHeader;
         public string? Name;
         public uint Unknown1;
         public uint TapeId; // The ID which shows in ArcServe, like ID - 17BE.
         public uint SessionNumber;
 
-        public const uint Signature = 0xDDDDDDDDU;
+        public ArcServeCatalogueFile(ArcServeSessionHeader sessionHeader)
+        {
+            this.SessionHeader = sessionHeader;
+        }
 
         /// <summary>
         /// Loads the catalogue file data from the reader.
         /// </summary>
+        /// <param name="tapeArchive">The tape archive to read the catalogue file for</param>
         /// <param name="reader">The reader to read from.</param>
-        public static ArcServeCatalogueFile Read(DataReader reader) {
-            ArcServeCatalogueFile newFile = new ArcServeCatalogueFile();
-            ArcServeSessionHeader.ReadSessionHeader(reader, out newFile.SessionHeader);
-            reader.Align(ArcServe.RootSectorSize);
+        public static ArcServeCatalogueFile Read(ArcServeTapeArchive tapeArchive, DataReader reader) {
+            ArcServeSessionHeader header = ArcServeSessionHeader.ReadSessionHeader(tapeArchive, reader);
+            ArcServeCatalogueFile newFile = new (header);
 
             newFile.Name = reader.ReadFixedSizeString(24);
             newFile.Unknown1 = reader.ReadUInt32();
@@ -50,43 +53,44 @@ namespace OnStreamSCArcServeExtractor
         /// <summary>
         /// Find missing files in the zip file created by the tape config.
         /// </summary>
-        /// <param name="tape">The tape config to find missing files from.</param>
-        /// <param name="logger">The logger to log output to.</param>
-        public static void FindMissingFilesFromTapeZip(TapeDefinition tape, ILogger logger)
+        /// <param name="tapeArchive">The loaded tape archive to find missing files from.</param>
+        public static void FindMissingFilesFromTapeZip(ArcServeTapeArchive tapeArchive)
         {
-            using ZipArchive? archive = ArcServeFileExtractor.OpenExtractedZipArchive(tape, logger);
+            using ZipArchive? archive = ArcServeFileExtractor.OpenExtractedZipArchive(tapeArchive.Definition, tapeArchive.Logger);
             if (archive != null)
-                ArcServeCatalogueFile.FindMissingFilesFromZipFile(archive, logger);
+                FindMissingFilesFromZipFile(tapeArchive, archive, tapeArchive.Logger);
         }
         
         /// <summary>
         /// Finds and logs missing/damaged files from a zip file.
         /// </summary>
-        /// <param name="archive">The archive to read from.</param>
+        /// <param name="tapeArchive">The tape archive to get data from.</param>
+        /// <param name="zipArchive">The zip archive to read from.</param>
         /// <param name="logger">The logger to write to.</param>
-        public static void FindMissingFilesFromZipFile(ZipArchive archive, ILogger logger) {
+        public static void FindMissingFilesFromZipFile(ArcServeTapeArchive tapeArchive, ZipArchive zipArchive, ILogger logger) {
             logger.LogInformation("Finding missing/damaged files...");
 
-            foreach (ZipArchiveEntry entry in archive.Entries) {
+            foreach (ZipArchiveEntry entry in zipArchive.Entries) {
                 if (!entry.Name.EndsWith(".CAT", StringComparison.InvariantCultureIgnoreCase))
                     continue;
 
                 using Stream zipStream = entry.Open();
-                using MemoryStream memoryStream = new MemoryStream();
+                using MemoryStream memoryStream = new ();
                 zipStream.CopyTo(memoryStream);
 
                 memoryStream.Seek(0, SeekOrigin.Begin);
-                using DataReader reader = new DataReader(memoryStream);
-                ArcServeCatalogueFile catalogueFile = Read(reader);
+                using DataReader reader = new (memoryStream);
+                ArcServeCatalogueFile catalogueFile = Read(tapeArchive, reader);
+                catalogueFile.SessionHeader.WriteInformation();
                 
                 logger.LogInformation($"Catalogue '{entry.Name}':");
-                FindMissingFilesFromCatFile(archive, catalogueFile, logger);
+                FindMissingFilesFromCatFile(zipArchive, catalogueFile, logger);
                 logger.LogInformation("");
             }
         }
         
         private static void FindMissingFilesFromCatFile(ZipArchive archive, ArcServeCatalogueFile file, ILogger logger) {
-            string lastPath = file.SessionHeader.RootDirectoryPath ?? string.Empty;
+            string lastPath = file.SessionHeader.RootDirectoryPath;
 
             long matchesFound = 0;
             long errorsFound = 0;

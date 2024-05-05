@@ -3,7 +3,7 @@ using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
 using OnStreamTapeLibrary;
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 
 namespace OnStreamSCArcServeExtractor
 {
@@ -15,83 +15,41 @@ namespace OnStreamSCArcServeExtractor
         public const uint StreamStartSignature = 0xCAACCAACU;
         public const int RootSectorSize = 0x200;
         public const bool FastDebuggingEnabled = false;
+        private static readonly Calendar ArcServeCalendar = Calendar.ReadOnly(new GregorianCalendar());
 
-        /// <summary>
-        /// Reads the definition of a file, stopping right before the file data begins, if there is any.
-        /// </summary>
-        /// <param name="header">Information about the tape session</param>
-        /// <param name="reader">The reader to read from.</param>
-        /// <param name="logger">The logger to write information to.</param>
-        /// <param name="definition">Output storage for the file definition.</param>
-        public static void ReadFileEntry(in ArcServeSessionHeader header, DataReader reader, ILogger logger, out ArcServeFileDefinition definition) {
-            definition = new ArcServeFileDefinition();
-            definition.RelativeFilePath = reader.ReadFixedSizeString(250);
-            definition.UnknownString1 = reader.ReadFixedSizeString(33);
-            definition.DirectoryLevel = reader.ReadByte();
-            uint lastModificationTimestamp = reader.ReadUInt32(ByteEndian.BigEndian);
-            definition.FileSizeInBytes = reader.ReadUInt32();
-            reader.SkipBytes(23); // Probably safe to ignore.
-            definition.LastAccessDate = reader.ReadUInt16();
-            uint fileCreationTimestamp = reader.ReadUInt32(ByteEndian.LittleEndian);
-            reader.SkipBytes(22);
-
-            definition.LastModificationTime = ParseTimeStamp(lastModificationTimestamp);
-            definition.FileCreationTime = ParseTimeStamp(fileCreationTimestamp);
-
-            // Read data chunks.
-            long sectionReadStart = reader.Index;
-            List<ArcServeStreamData> streamChunks = definition.StreamChunks = new List<ArcServeStreamData>();
-
-            if ((header.Flags & ArcServeSessionFlags.Compressed) == ArcServeSessionFlags.Compressed) {
-                long lastChunkDataStart = sectionReadStart;
-                try {
-                    ArcServeStreamData streamData;
-                    while ((streamData = ParseSection(reader, logger)) is not ArcServeStreamEndData) {
-                        if (streamData is ArcServeStreamWindowsFileName fileNamePacket)
-                            definition.FileDeclaration = fileNamePacket;
-                        if (streamData is ArcServeStreamFullPathData fullPathPacket)
-                            definition.FullPathData = fullPathPacket;
-
-                        streamChunks.Add(streamData);
-                        lastChunkDataStart = reader.Index;
-                    }
-                } catch (Exception ex) {
-                    logger.LogTrace(ex, "Failed when parsing stream chunk at {lastChunkDataStart}", reader.GetFileIndexDisplay(lastChunkDataStart));
-                }
-            } else {
-                ArcServeStreamHeader streamChunkHeader = new ArcServeStreamHeader
-                    {
-                        Size = definition.FileSizeInBytes,
-                        Name = definition.RelativeFilePath
-                    };
-                
-                ArcServeStreamRawData rawData = new ();
-                rawData.LoadFromReader(reader, in streamChunkHeader);
-                streamChunks.Add(rawData);
-            }
-
-            if (!definition.IsDirectory && !definition.IsFile)
-                logger.LogError(" - Expected the type at {sectionReadStart} to either be a File or a Directory, but got {blockType:X8} instead.", reader.GetFileIndexDisplay(sectionReadStart), definition.FileDeclaration?.Block.Type);
-        }
-        
         /// <summary>
         /// Parses an ArcServe timestamp into <see cref="DateTime"/>.
         /// </summary>
         /// <param name="number">The ArcServe timestamp</param>
         /// <param name="startYear">The year which the timestamp counts upwards from</param>
         /// <returns>Parsed timestamp</returns>
-        public static DateTime ParseTimeStamp(uint number, uint startYear = 1980) {
+        public static DateTime ParseTimeStamp(uint number, int startYear = 1980) {
             if (number == 0)
-                return DateTime.UnixEpoch;
+                return new DateTime(startYear, 1, 1, 0, 0, 0, DateTimeKind.Local);
 
             uint second = (number & 0b11111) << 1;
             uint minute = (number >> 5) & 0b111111;
             uint hour = ((number >> 11) & 0b11111);
             uint day = (number >> 16) & 0b11111;
             uint month = (number >> 21) & 0b1111;
-            uint year = startYear + ((number >> 25) & 0x7F);
-
+            uint year = (uint) startYear + ((number >> 25) & 0x7F);
             return new DateTime((int)year, (int)month, (int)day, (int)hour, (int)minute, (int)second, DateTimeKind.Local);
+        }
+        
+        /// <summary>
+        /// Parses an ArcServe 16-bit date into <see cref="DateOnly"/>.
+        /// </summary>
+        /// <param name="number">The ArcServe date number</param>
+        /// <param name="startYear">The year which the date counts upwards from</param>
+        /// <returns>Parsed Date</returns>
+        public static DateOnly ParseDate(ushort number, int startYear = 1980) {
+            if (number == 0)
+                return new DateOnly(startYear, 1, 1, ArcServeCalendar);
+            
+            int day = (number & 0b11111); // 5 bits
+            int month = (number >> 5) & 0b1111; // 4 bits
+            int year = startYear + ((number >> 9) & 0x7F); // 7 bits
+            return new DateOnly(year, month, day, ArcServeCalendar);
         }
         
         /// <summary>
@@ -101,11 +59,13 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="block">Output storage for the block header.</param>
         /// <returns>Whether a stream header was found/parsed.</returns>
         public static bool TryParseStreamHeader(DataReader reader, out ArcServeStreamHeader block) {
+            long readerStartIndex = reader.Index;
             uint magicSignature = reader.ReadUInt32(ByteEndian.BigEndian);
 
             block = new ArcServeStreamHeader();
             if (magicSignature != StreamStartSignature) {
                 block.Id = magicSignature;
+                reader.Index = readerStartIndex;
                 return false;
             }
 
@@ -116,8 +76,14 @@ namespace OnStreamSCArcServeExtractor
             block.NameSize = reader.ReadUInt32();
             block.Type = reader.ReadUInt32(ByteEndian.BigEndian);
             block.RawFlags = reader.ReadUInt32();
-            block.Name = (block.NameSize > 0) ? reader.ReadStringBytes((int)block.NameSize) : string.Empty;
-            
+
+            if (block.NameSize > 0) {
+                block.Name = reader.ReadStringBytes((int) block.NameSize - 1);
+                reader.SkipBytesRequireEmpty(1);
+            } else {
+                block.Name = string.Empty;
+            }
+
             return true;
         }
         
@@ -198,26 +164,5 @@ namespace OnStreamSCArcServeExtractor
 
             return input.Length < 20 || validLooking >= input.Length / 2;
         }
-    }
-    
-    /// <summary>
-    /// Represents the definition of a file.
-    /// </summary>
-    public struct ArcServeFileDefinition
-    {
-        public string RelativeFilePath; // Relative to the root directory. Seems to be a Dos Path on Windows.
-        public string UnknownString1;
-        public byte DirectoryLevel;
-        public DateTime LastModificationTime;
-        public uint FileSizeInBytes;
-        public ushort LastAccessDate;
-        public DateTime FileCreationTime;
-        public ArcServeStreamWindowsFileName? FileDeclaration;
-        public ArcServeStreamFullPathData? FullPathData;
-        public List<ArcServeStreamData>? StreamChunks;
-
-        public bool IsFile => this.FileDeclaration == null || this.FileDeclaration.Block.Type == (uint)ArcServeStreamType.File;
-        public bool IsDirectory => this.FileDeclaration != null && this.FileDeclaration.Block.Type == (uint)ArcServeStreamType.Directory;
-        public string FullPath => this.FullPathData?.FullPath ?? this.RelativeFilePath;
     }
 }

@@ -1,47 +1,97 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
 using ModToolFramework.Utils.Extensions;
 
-namespace OnStreamSCArcServeExtractor
+namespace OnStreamSCArcServeExtractor.Packets
 {
     /// <summary>
     /// Represents the header of an ArcServe tape session.
     /// </summary>
-    public struct ArcServeSessionHeader {
-        public ArcServeSessionHeaderSignature Signature;
-        public string? RootDirectoryPath;
-        public string? UserName;
-        public string? Password;
-        public string? Description;
-        public ArcServeSessionType Type;
-        public ArcServeSessionMode Mode;
-        public ArcServeSessionFlags Flags;
-        public ArcServeCompressionType CompressionType;
-        public byte CompressionLevel;
-        public byte UnixFileSystemNameLength;
-        public byte LastSession;
-        public ushort ExtendedSessionHeader;
+    public class ArcServeSessionHeader : ArcServeFilePacket
+    {
+        public string RootDirectoryPath { get; private set; } = string.Empty;
+        public string UserName { get; private set; } = string.Empty;
+        public string Password { get; private set; } = string.Empty;
+        public string Description { get; private set; } = string.Empty;
+        public ArcServeSessionType Type { get; private set; }
+        public ArcServeSessionMode Mode { get; private set; }
+        public ArcServeSessionFlags Flags { get; private set; }
+        public ArcServeCompressionType CompressionType { get; private set; }
+        public byte CompressionLevel { get; private set; }
+        public byte UnixFileSystemNameLength { get; private set; }
+        public byte LastSession { get; private set; }
+        public ushort ExtendedSessionHeader { get; private set; }
         
         // Encryption
-        public byte SizeOfSizeOfEncryptedEncryptionPasswordKey;
-        public byte SizeOfEncryptedEncryptionBabKey;
-        public byte[] SecondPartOfEncryptedEncryptionPasswordKey;
-        public byte[] SecondPartOfEncryptedEncryptionBabKey;
-        public byte[] EncryptionKey;
+        public byte SizeOfSizeOfEncryptedEncryptionPasswordKey { get; private set; }
+        public byte SizeOfEncryptedEncryptionBabKey { get; private set; }
+        public readonly byte[] SecondPartOfEncryptedEncryptionPasswordKey = new byte[12];
+        public readonly byte[] SecondPartOfEncryptedEncryptionBabKey = new byte[12];
+        public readonly byte[] EncryptionKey = new byte[24];
 
-        public uint Version;
-        public ushort TapeNumber;
-        public DateTime? StartTime;
-        public ArcServeWorkStationType WorkStationType;
-        public string? WorkStationName;
+        public uint Version { get; private set; }
+        public ushort TapeNumber { get; private set; }
+        public DateTime? StartTime { get; private set; }
+        public ArcServeWorkStationType WorkStationType { get; private set; }
+        public string WorkStationName { get; private set; } = string.Empty;
         
         // Os2:
-        public ArcServeCompressionMethod CompressionMethod;
-        public ushort BackupDateOs2;
-        public ushort BackupTimeOs2;
-        public byte[] IndexFileOs2;
+        public ArcServeCompressionMethod CompressionMethod { get; private set; }
+        public ushort BackupDateOs2 { get; private set; }
+        public ushort BackupTimeOs2 { get; private set; }
+        public readonly byte[] IndexFileOs2 = new byte[9];
+        
+        // Getters:
+        public new ArcServeSessionHeaderSignature Signature => (ArcServeSessionHeaderSignature) base.Signature;
+        public override bool AppearsValid => true; // If it passed the strict parsing logic, it's probably valid.
+
+        /// <summary>
+        /// Creates a new <see cref="ArcServeSessionHeader"/> with the given signature.
+        /// </summary>
+        /// <param name="archive">The archive which the session header belongs to</param>
+        /// <param name="signature">the header signature</param>
+        public ArcServeSessionHeader(ArcServeTapeArchive archive, ArcServeSessionHeaderSignature signature) : base(
+            archive, (uint) signature)
+        {
+        }
+        
+        /// <inheritdoc cref="LoadFromReader"/>
+        public override void LoadFromReader(DataReader reader) {
+            this.RootDirectoryPath = reader.ReadFixedSizeString(128);
+            this.UserName = reader.ReadFixedSizeString(48);
+            this.Password = reader.ReadFixedSizeString(24);
+            this.Description = reader.ReadFixedSizeString(80);
+            this.Type = reader.ReadEnum<ushort, ArcServeSessionType>();
+            this.Mode = reader.ReadEnum<byte, ArcServeSessionMode>();
+            this.Flags = reader.ReadBitFlagEnum<uint, ArcServeSessionFlags>();
+            this.CompressionType = reader.ReadEnum<byte, ArcServeCompressionType>();
+            this.CompressionLevel = reader.ReadByte();
+            this.UnixFileSystemNameLength = reader.ReadByte();
+            this.SizeOfSizeOfEncryptedEncryptionPasswordKey = reader.ReadByte();
+            this.SizeOfEncryptedEncryptionBabKey = reader.ReadByte();
+            reader.Read(this.SecondPartOfEncryptedEncryptionPasswordKey);
+            reader.Read(this.SecondPartOfEncryptedEncryptionBabKey);
+            this.Version = reader.ReadUInt32();
+            reader.SkipBytesRequireEmpty(8);
+            this.TapeNumber = reader.ReadUInt16();
+            this.StartTime = ArcServe.ParseTimeStamp(reader.ReadUInt32(ByteEndian.BigEndian), 1900);
+            _ = reader.ReadByte();
+            reader.SkipBytesRequire(1, 1);
+            this.WorkStationType = reader.ReadEnum<byte, ArcServeWorkStationType>();
+            this.WorkStationName = reader.ReadFixedSizeString(64);
+            this.CompressionMethod = reader.ReadEnum<byte, ArcServeCompressionMethod>();
+            this.BackupDateOs2 = reader.ReadUInt16();
+            this.BackupTimeOs2 = reader.ReadUInt16();
+            reader.Read(this.IndexFileOs2);
+            this.LastSession = reader.ReadByte();
+            reader.SkipBytesRequireEmpty(4);
+            this.ExtendedSessionHeader = reader.ReadUInt16();
+            reader.Read(this.EncryptionKey);
+            reader.SkipBytesRequireEmpty(62);
+        }
 
         /// <summary>
         /// Prints session header information to the logger.
@@ -97,57 +147,44 @@ namespace OnStreamSCArcServeExtractor
             if (this.ExtendedSessionHeader != 0)
                 logger.LogInformation("{padding} Extended Session Header: {value}", padding, this.ExtendedSessionHeader);
         }
+        
+        /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
+        public override void WriteInformation()
+        {
+            this.Logger.LogInformation("");
+            this.PrintSessionHeaderInformation(this.Logger);
+            this.Logger.LogInformation("");
+        }
 
-        /// <summary>
-        /// Reads an ArcServe session header.
-        /// </summary>
-        /// <param name="reader">The reader to read from.</param>
-        /// <param name="header">The output storage for the header.</param>
-        public static void ReadSessionHeader(DataReader reader, out ArcServeSessionHeader header) {
-            ArcServeSessionHeaderSignature signature = reader.ReadEnum<uint, ArcServeSessionHeaderSignature>();
-            ReadSessionHeader(reader, signature, out header);
+        /// <inheritdoc cref="ArcServeFilePacket.Process"/>
+        public override bool Process(DataReader reader)
+        {
+            if (ArcServe.IsValidLookingString(this.RootDirectoryPath))
+                this.TapeArchive.CurrentBasePath = this.RootDirectoryPath;
+
+            return true; // Processing always succeeds.
         }
 
         /// <summary>
         /// Reads an ArcServe session header.
         /// </summary>
+        /// <param name="archive">The archive which the session header should belong to.</param>
+        /// <param name="reader">The reader to read from.</param>
+        public static ArcServeSessionHeader ReadSessionHeader(ArcServeTapeArchive archive, DataReader reader) {
+            ArcServeSessionHeaderSignature signature = reader.ReadEnum<uint, ArcServeSessionHeaderSignature>();
+            return ReadSessionHeader(archive, reader, signature);
+        }
+
+        /// <summary>
+        /// Reads an ArcServe session header.
+        /// </summary>
+        /// <param name="archive">The archive which the session header should belong to.</param>
         /// <param name="reader">The reader to read from.</param>
         /// <param name="signature">The signature of the session header.</param>
-        /// <param name="header">The output storage for the header.</param>
-        public static void ReadSessionHeader(DataReader reader, ArcServeSessionHeaderSignature signature, out ArcServeSessionHeader header) {
-            header = new ArcServeSessionHeader();
-            header.Signature = signature;
-            header.RootDirectoryPath = reader.ReadFixedSizeString(128);
-            header.UserName = reader.ReadFixedSizeString(48);
-            header.Password = reader.ReadFixedSizeString(24);
-            header.Description = reader.ReadFixedSizeString(80);
-            header.Type = reader.ReadEnum<ushort, ArcServeSessionType>();
-            header.Mode = reader.ReadEnum<byte, ArcServeSessionMode>();
-            header.Flags = reader.ReadBitFlagEnum<uint, ArcServeSessionFlags>();
-            header.CompressionType = reader.ReadEnum<byte, ArcServeCompressionType>();
-            header.CompressionLevel = reader.ReadByte();
-            header.UnixFileSystemNameLength = reader.ReadByte();
-            header.SizeOfSizeOfEncryptedEncryptionPasswordKey = reader.ReadByte();
-            header.SizeOfEncryptedEncryptionBabKey = reader.ReadByte();
-            header.SecondPartOfEncryptedEncryptionPasswordKey = reader.ReadBytes(12);
-            header.SecondPartOfEncryptedEncryptionBabKey = reader.ReadBytes(12);
-            header.Version = reader.ReadUInt32();
-            reader.SkipBytesRequireEmpty(8);
-            header.TapeNumber = reader.ReadUInt16();
-            header.StartTime = ArcServe.ParseTimeStamp(reader.ReadUInt32(ByteEndian.BigEndian), 1900);
-            _ = reader.ReadByte();
-            reader.SkipBytesRequire(1, 1);
-            header.WorkStationType = reader.ReadEnum<byte, ArcServeWorkStationType>();
-            header.WorkStationName = reader.ReadFixedSizeString(64);
-            header.CompressionMethod = reader.ReadEnum<byte, ArcServeCompressionMethod>();
-            header.BackupDateOs2 = reader.ReadUInt16();
-            header.BackupTimeOs2 = reader.ReadUInt16();
-            header.IndexFileOs2 = reader.ReadBytes(9);
-            header.LastSession = reader.ReadByte();
-            reader.SkipBytesRequireEmpty(4);
-            header.ExtendedSessionHeader = reader.ReadUInt16();
-            header.EncryptionKey = reader.ReadBytes(24);
-            reader.SkipBytesRequireEmpty(62);
+        public static ArcServeSessionHeader ReadSessionHeader(ArcServeTapeArchive archive, DataReader reader, ArcServeSessionHeaderSignature signature) {
+            ArcServeSessionHeader header = new (archive, signature);
+            header.LoadFromReader(reader);
+            return header;
         }
     }
     
@@ -245,13 +282,14 @@ namespace OnStreamSCArcServeExtractor
     public enum ArcServeCompressionType : byte
     {
         Any,
-        Pkware,
+        PkWare,
         Gnu
     }
     
     /// <summary>
     /// Represents the available compression types.
     /// </summary>
+    [SuppressMessage("ReSharper", "CommentTypo")]
     public enum ArcServeCompressionMethod : byte
     {
         None,
