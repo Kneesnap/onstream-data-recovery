@@ -16,7 +16,6 @@ namespace OnStreamSCArcServeExtractor.Packets
     /// </summary>
     public class ArcServeFileHeaderUniversal : ArcServeFileHeader
     {
-        public List<ArcServeStreamData>? CachedDataChunkStream { get; private set; }
         public ArcServeStreamWindowsFileName? FileDeclaration { get; private set; }
         public ArcServeStreamFullPathData? FullPathData { get; private set; }
         public override bool IsDirectory => base.IsDirectory || (this.FileDeclaration != null && this.FileDeclaration.Block.Type == (uint) ArcServeStreamType.Directory);
@@ -60,13 +59,26 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
 
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
+        protected override void ReadAndDisplayExtraFileData(DataReader reader) {
+            base.ReadAndDisplayExtraFileData(reader);
+            
+            // Process remaining chunks.
+            foreach (ArcServeStreamData streamDataChunk in this.ReadDataChunksFromReader(reader, true)) {
+                streamDataChunk.WritePacketReadInfo(this.Logger, reader);
+            }
+        }
+
+        /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {
             // Process file data.
             uint sectionId = 0;
             foreach (ArcServeStreamData streamDataChunk in this.ReadDataChunksFromReader(reader)) {
-                if (streamDataChunk is not ArcServeStreamRawData rawData)
+                if (streamDataChunk is not ArcServeStreamRawData rawData) {
+                    this.CachedDataChunkStream?.Add(streamDataChunk); // Cache everything but the raw file data.
+                    streamDataChunk.WritePacketReadInfo(this.Logger, reader);
                     continue;
+                }
 
                 long tempStartIndex = reader.Index;
                 if (rawData.ExpectedDecompressedSize != 0 && rawData.RawData != rawData.UsableData && rawData.UsableData.Length != rawData.ExpectedDecompressedSize)
@@ -92,9 +104,9 @@ namespace OnStreamSCArcServeExtractor.Packets
             // Read data chunks.
             long dataStreamStartIndex = reader.Index;
             long lastChunkStartIndex = dataStreamStartIndex;
-            ArcServeStreamData streamData;
-            while ((streamData = ParseSectionSafe(reader, lastChunkStartIndex)) is not ArcServeStreamEndData) {
-                if (storeInCache) 
+            ArcServeStreamData? streamData = null;
+            while (streamData is not ArcServeStreamEndData && (streamData = ParseSectionSafe(reader, lastChunkStartIndex)) != null) {
+                if (storeInCache)
                     this.CachedDataChunkStream?.Add(streamData);
                 lastChunkStartIndex = reader.Index;
                 yield return streamData;

@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils.Extensions;
+using OnStreamTapeLibrary;
 using TestBed;
 
 namespace OnStreamSCArcServeExtractor
@@ -48,6 +50,8 @@ namespace OnStreamSCArcServeExtractor
     public abstract class ArcServeStreamData
     {
         public ArcServeStreamHeader Block;
+        public long BodyStartIndex;
+        public long BodyEndIndex;
         
         /// <summary>
         /// Loads the stream data from the reader.
@@ -56,6 +60,21 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="block">The block to read.</param>
         public virtual void LoadFromReader(DataReader reader, in ArcServeStreamHeader block) {
             this.Block = block;
+        }
+
+        /// <summary>
+        /// Gets extra information to log to the logger.
+        /// </summary>
+        /// <returns>the extra information to log.</returns>
+        public virtual string GetExtraLoggerInfo() => string.Empty;
+
+        /// <summary>
+        /// Write packet read info to the logger.
+        /// </summary>
+        /// <param name="logger">The logger to write the data to.</param>
+        /// <param name="reader">The reader to calculate read positions with.</param>
+        public void WritePacketReadInfo(ILogger logger, DataReader reader) {
+            logger.LogDebug(" - Read ArcServe Section {section}/{header} at {address}. (Header End: {streamDataStart}, Data End: {alignedDataEndIndex}){extraData}", this.GetTypeDisplayName(), this.Block, reader.GetFileIndexDisplay(this.Block.HeaderStartIndex), reader.GetFileIndexDisplay(this.BodyStartIndex), reader.GetFileIndexDisplay(this.BodyEndIndex), this.GetExtraLoggerInfo());
         }
     }
 
@@ -154,6 +173,9 @@ namespace OnStreamSCArcServeExtractor
         public uint RawFlags;
         public string Name;
 
+        public long HeaderStartIndex;
+        public long HeaderEndIndex;
+        
         public StreamFlags Flags => (StreamFlags)this.RawFlags;
 
         public const int SizeInBytes = 32;

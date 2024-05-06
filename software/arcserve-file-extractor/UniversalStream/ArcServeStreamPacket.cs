@@ -29,6 +29,7 @@ namespace OnStreamSCArcServeExtractor.UniversalStream
             signature = reader.ReadUInt32(ByteEndian.BigEndian);
 
             block = new ArcServeStreamHeader();
+            block.HeaderStartIndex = readerStartIndex;
             if (signature != StreamStartSignature) {
                 reader.Index = readerStartIndex;
                 return false;
@@ -49,6 +50,7 @@ namespace OnStreamSCArcServeExtractor.UniversalStream
                 block.Name = string.Empty;
             }
 
+            block.HeaderEndIndex = reader.Index;
             return true;
         }
         
@@ -96,10 +98,10 @@ namespace OnStreamSCArcServeExtractor.UniversalStream
         /// <returns>parsed stream section</returns>
         /// <exception cref="Exception">Thrown if there was no stream to read, or if there was an error reading the stream.</exception>
         public static ArcServeStreamData ReadStreamPacketWithHeader(DataReader reader, ILogger logger, long headerStartIndex, in ArcServeStreamHeader streamHeader) {
-            long streamDataStartIndex = reader.Index;
             ArcServeStreamData packet = ArcServeStreamDataTypes.CreatePacket(in streamHeader);
+            long streamDataStartIndex = packet.BodyStartIndex = reader.Index;
             packet.LoadFromReader(reader, in streamHeader);
-            long streamDataEndIndex = reader.Index;
+            long streamDataEndIndex = packet.BodyEndIndex = reader.Index;
             long readStreamDataSize = (streamDataEndIndex - streamDataStartIndex);
 
             // Verify correct amount was read.
@@ -107,7 +109,6 @@ namespace OnStreamSCArcServeExtractor.UniversalStream
                 logger.LogWarning(" - Stream Header @ {headerStartIndex} had a length of {blockSize} bytes, but {readStreamDataSize} were read.", reader.GetFileIndexDisplay(headerStartIndex), streamHeader.Size, readStreamDataSize);
 
             AlignReaderToStream(reader); // Align the reader.
-            logger.LogDebug(" - Parsed ArcServe Section {section}/{header} at {address}. (Header End: {streamDataStart}, Data End : {alignedDataEndIndex})", packet.GetTypeDisplayName(), streamHeader, reader.GetFileIndexDisplay(headerStartIndex), reader.GetFileIndexDisplay(streamDataStartIndex), reader.GetFileIndexDisplay());
             return packet;
         }
 

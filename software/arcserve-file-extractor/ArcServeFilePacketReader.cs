@@ -32,7 +32,7 @@ namespace OnStreamSCArcServeExtractor
             if (this.SkippedSectorCount <= 0)
                 return;
 
-            this.TapeArchive.Logger.LogInformation("Skipped {skipCount} packet section(s) starting at {readerIndex}/{signature:X8} did not appear to be valid. (End Index: {endReaderIndex})", this.SkippedSectorCount, this.FirstSkippedSectorSignature, this.Reader.GetFileIndexDisplay(this.FirstSkippedSectorIndex), this.Reader.GetFileIndexDisplay());
+            this.TapeArchive.Logger.LogInformation("Skipped {skipCount} packet section(s) starting at {readerIndex}/{signature:X8} did not appear to be valid. (End Index: {endReaderIndex})", this.SkippedSectorCount, this.Reader.GetFileIndexDisplay(this.FirstSkippedSectorIndex), this.FirstSkippedSectorSignature, this.Reader.GetFileIndexDisplay());
             this.SkippedSectorCount = 0;
             this.FirstSkippedSectorIndex = -1;
             this.FirstSkippedSectorSignature = 0xBADDEAD;
@@ -74,7 +74,7 @@ namespace OnStreamSCArcServeExtractor
 
                 // Ensure we can see what actually caused the error.
                 if (newPacket.AppearsValid) {
-                    newPacket.WriteInformation();
+                    newPacket.WriteInformation(this.Reader);
                 } else {
                     // Avoid printing garbage text characters if we can avoid it. It's not a huge deal but it can be annoying.
                     this.TapeArchive.Logger.LogError("Failed to read packet of type {packetType} from {startIndex}. (The data was too broken to display)", newPacket.GetTypeDisplayName(), this.Reader.GetFileIndexDisplay(packetReadStartIndex));
@@ -86,7 +86,7 @@ namespace OnStreamSCArcServeExtractor
             // If the packet looks like a valid packet, handle it.
             bool loadSuccess = false;
             if (newPacket.AppearsValid) {
-                newPacket.WriteInformation();
+                newPacket.WriteInformation(this.Reader);
                 loadSuccess = newPacket.Process(this.Reader);
                 if (loadSuccess && newPacket is ArcServeSessionHeader sessionHeaderPacket)
                     this.LastSessionHeader = sessionHeaderPacket;

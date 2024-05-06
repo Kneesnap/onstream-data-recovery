@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -30,6 +31,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         public uint DirectorySpaceRestriction { get; private set; }
         public DateOnly SharedLastAccessDate { get; private set; }
         public DateTime SharedFileCreationTime { get; private set; }
+        public List<ArcServeStreamData>? CachedDataChunkStream { get; protected set; }
 
         // Metadata.
         public string? FormattedReaderStartIndex { get; private set; }
@@ -100,9 +102,14 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
 
         /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
-        public override void WriteInformation()
+        public override void WriteInformation(DataReader reader)
         {
             this.Logger.LogInformation("{fileHeaderInfo}", this);
+            
+            // Write data streak chunk info.
+            if (this.CachedDataChunkStream != null) 
+                for (int i = 0; i < this.CachedDataChunkStream.Count; i++) 
+                    this.CachedDataChunkStream[i].WritePacketReadInfo(this.Logger, reader);
         }
         
         /// <inheritdoc cref="ArcServeFilePacket.Process"/>
@@ -116,9 +123,11 @@ namespace OnStreamSCArcServeExtractor.Packets
             ArcServeTapeArchive tapeArchive = this.TapeArchive;
             string fullFilePath = this.FullFilePath;
 
-            // TODO: Hmm. I think we can handle this some other way maybe?
-            if (string.IsNullOrWhiteSpace(this.RelativeFilePath))
+            // TODO: Hmm. I think we can handle this some other way maybe? (Perhaps just if we see an EndOfData marker?)
+            if (string.IsNullOrWhiteSpace(this.RelativeFilePath)) {
+                this.ReadAndDisplayExtraFileData(reader);
                 return true; // It's not a file entry, but instead first file in a session.
+            }
 
             // Handle file.
             if (this.IsDirectory) {
@@ -129,6 +138,9 @@ namespace OnStreamSCArcServeExtractor.Packets
                 ZipArchiveEntry entry = tapeArchive.Archive.CreateEntry(folderPath, CompressionLevel.Fastest);
                 if (this.LastModificationTime != DateTime.UnixEpoch)
                     entry.LastWriteTime = this.LastModificationTime;
+
+                // Show remaining packets.
+                this.ReadAndDisplayExtraFileData(reader);
             } else if (this.IsFile) {
                 // Create entry for file.
                 ZipArchiveEntry entry = tapeArchive.Archive.CreateEntry(fullFilePath, CompressionLevel.Fastest);
@@ -150,6 +162,14 @@ namespace OnStreamSCArcServeExtractor.Packets
                 this.Logger.LogError(" - Expected the type at {sectionReadStart} to either be a File or a Directory, but got ???? instead.", reader.GetFileIndexDisplay(dataStreamStartIndex));
 
             return true;
+        }
+
+        /// <summary>
+        /// Called to handle reading extra file data, when feasible.
+        /// </summary>
+        /// <param name="reader">The reader to read file contents from.</param>
+        protected virtual void ReadAndDisplayExtraFileData(DataReader reader) {
+            // Do nothing by default.
         }
         
         /// <summary>

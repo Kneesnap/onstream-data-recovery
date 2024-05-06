@@ -81,7 +81,7 @@ namespace OnStreamSCArcServeExtractor
                 memoryStream.Seek(0, SeekOrigin.Begin);
                 using DataReader reader = new (memoryStream);
                 ArcServeCatalogueFile catalogueFile = Read(tapeArchive, reader);
-                catalogueFile.SessionHeader.WriteInformation();
+                catalogueFile.SessionHeader.WriteInformation(reader);
                 
                 logger.LogInformation($"Catalogue '{entry.Name}':");
                 FindMissingFilesFromCatFile(zipArchive, catalogueFile, logger);

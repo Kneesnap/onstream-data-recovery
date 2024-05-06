@@ -150,7 +150,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
         
         /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
-        public override void WriteInformation()
+        public override void WriteInformation(DataReader reader)
         {
             this.Logger.LogInformation("");
             this.PrintSessionHeaderInformation(this.Logger);

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Text;
+using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils.Data;
 
 namespace OnStreamSCArcServeExtractor.Packets
@@ -30,12 +31,16 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
 
         /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
-        public override void WriteInformation() {
-            if (this.CrcChecksum != 0 || !string.IsNullOrEmpty(this.RelativeFilePath)) {
-                this.Logger.LogInformation(" - Reached End of File: {relativeFilePath}, Hash: {crcHash}, Unknown: {unknown}", this.RelativeFilePath, this.CrcChecksum, this.Unknown);
-            } else {
-                this.Logger.LogInformation(" - Reached End of File");
-            }
+        public override void WriteInformation(DataReader reader) {
+            StringBuilder builder = new (" - Reached End of File");
+            if (!string.IsNullOrEmpty(this.RelativeFilePath))
+                builder.AppendFormat(": {0}", this.RelativeFilePath);
+            if (this.CrcChecksum != 0)
+                builder.AppendFormat(", Hash: {0:X8}", this.CrcChecksum);
+            if (this.Unknown != 0)
+                builder.AppendFormat(", Unknown: {0:X}", this.Unknown);
+            
+            this.Logger.LogInformation("{information}", builder);
         }
         
         /// <inheritdoc cref="ArcServeFilePacket.Process"/>
