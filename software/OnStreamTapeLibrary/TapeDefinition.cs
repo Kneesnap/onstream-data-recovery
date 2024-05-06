@@ -24,8 +24,8 @@ namespace OnStreamTapeLibrary
         public readonly string FolderPath;
         public readonly bool HasOnStreamAuxData;
         public readonly Config Config;
-        public readonly List<TapeDumpFile> Entries = new List<TapeDumpFile>();
-        public readonly HashSet<uint> SkippedPhysicalBlocks = new HashSet<uint>();
+        public readonly List<TapeDumpFile> Entries = new ();
+        public readonly HashSet<uint> SkippedPhysicalBlocks = new ();
 
         private TapeDefinition(OnStreamCartridgeType type, string displayName, string folderPath, bool hasOnStreamAuxData, Config config) {
             this.Type = type;
@@ -55,7 +55,7 @@ namespace OnStreamTapeLibrary
         /// <param name="blockMapping">The mapping of tape blocks to read from.</param>
         /// <returns>orderedList</returns>
         public List<OnStreamTapeBlock> CreateLogicallyOrderedBlockList(Dictionary<uint, OnStreamTapeBlock> blockMapping) {
-            List<OnStreamTapeBlock> blocks = new List<OnStreamTapeBlock>();
+            List<OnStreamTapeBlock> blocks = new ();
             OnStreamPhysicalPosition position = this.Type.FromLogicalBlock(0);
 
             OnStreamTapeBlock? lastTapeBlock = null;
@@ -89,7 +89,7 @@ namespace OnStreamTapeLibrary
         /// <param name="blockMapping">The mapping of tape blocks to read from.</param>
         /// <returns>orderedList</returns>
         public List<OnStreamTapeBlock> CreatePhysicallyOrderedBlockList(Dictionary<uint, OnStreamTapeBlock> blockMapping) {
-            List<OnStreamTapeBlock> blocks = new List<OnStreamTapeBlock>();
+            List<OnStreamTapeBlock> blocks = new ();
             OnStreamPhysicalPosition position = this.Type.FromLogicalBlock(0);
 
             OnStreamTapeBlock? lastTapeBlock = null;
@@ -130,7 +130,7 @@ namespace OnStreamTapeLibrary
         /// <returns>The loaded config, or null if it could not be loaded.</returns>
         public static TapeDefinition? LoadFromConfigFile(string configFilePath, ILogger logger) {
             if (!File.Exists(configFilePath)) {
-                logger.LogError($"The tape config file '{configFilePath}' does not exist.");
+                logger.LogError("The tape config file '{configFilePath}' does not exist.", configFilePath);
                 return null;
             }
 
@@ -148,14 +148,14 @@ namespace OnStreamTapeLibrary
         public static TapeDefinition? LoadFromConfig(Config config, string configFilePath, ILogger logger) {
             string? tapeFolder = Path.GetDirectoryName(configFilePath);
             if (tapeFolder == null) {
-                logger.LogError($"Couldn't get directory holding '{configFilePath}'.");
+                logger.LogError("Couldn't get directory holding '{configFilePath}'.", configFilePath);
                 return null;
             }
 
             OnStreamCartridgeType type = config.GetValueOrError("type").GetAsEnum<OnStreamCartridgeType>();
             string displayName = config.GetValue("name")?.GetAsString() ?? config.SectionName;
             bool hasAuxData = config.GetValue("hasAuxData")?.GetAsBoolean() ?? (type != OnStreamCartridgeType.Raw);
-            TapeDefinition newTapeConfig = new TapeDefinition(type, displayName, tapeFolder, hasAuxData, config);
+            TapeDefinition newTapeConfig = new (type, displayName, tapeFolder, hasAuxData, config);
 
             if (config.HasKey("skip")) {
                 string[] skippedStr = config.GetValue("skip").GetAsString().Split(",", StringSplitOptions.RemoveEmptyEntries);
@@ -163,7 +163,7 @@ namespace OnStreamTapeLibrary
                     if (UInt32.TryParse(skippedStr[i], out uint parsedBlock)) {
                         newTapeConfig.SkippedPhysicalBlocks.Add(type.ConvertLogicalBlockToPhysicalBlock(parsedBlock));
                     } else {
-                        logger.LogError($"Tape was supposed to skip block '{skippedStr[i]}' but it was not a number!");
+                        logger.LogError("Tape was supposed to skip block '{skippedStr}' but it was not a number!", skippedStr[i]);
                     }
                 }
             }
@@ -177,9 +177,9 @@ namespace OnStreamTapeLibrary
                 if (Int32.TryParse(tapeFileEntry.SectionName, out int parsedBlockIndex))
                     blockIndex = parsedBlockIndex;
 
-                TapeDumpFile newFile = new TapeDumpFile(newTapeConfig, blockIndex);
+                TapeDumpFile newFile = new (newTapeConfig, blockIndex);
                 if (!newFile.Load(tapeFileEntry, logger)) {
-                    logger.LogError($"Failed to load tape dump configuration {blockIndex}.");
+                    logger.LogError("Failed to load tape dump configuration {blockIndex}.", blockIndex);
                     return null;
                 }
 
@@ -199,7 +199,7 @@ namespace OnStreamTapeLibrary
         private Stream? _rawStream;
         public readonly TapeDefinition Tape;
         public readonly int? BlockIndex;
-        public readonly List<uint> Errors = new List<uint>();
+        public readonly List<uint> Errors = new ();
         public string? Name { get; private set; }
         public string? FileName { get; private set; }
         public string? DumpFilePath { get; private set; }
@@ -253,7 +253,7 @@ namespace OnStreamTapeLibrary
             this.DumpFilePath = this.GetFilePath("dump");
             this.FileName = Path.GetFileName(this.DumpFilePath);
             if (!File.Exists(this.DumpFilePath)) {
-                logger.LogError($"File '{this.DumpFilePath}' was not found.");
+                logger.LogError("File '{dumpFilePath}' was not found.", this.DumpFilePath);
                 return false;
             }
 
@@ -271,7 +271,7 @@ namespace OnStreamTapeLibrary
             this.Errors.Sort();
             
             // Read string.
-            FileStream fileStream = new FileStream(this.DumpFilePath, FileMode.Open, FileAccess.Read);
+            FileStream fileStream = new (this.DumpFilePath, FileMode.Open, FileAccess.Read);
             this._rawStream = new BufferedStream(fileStream);
             this._stream = new OnStreamDataStream(this._rawStream);
             return true;

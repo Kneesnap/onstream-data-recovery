@@ -9,7 +9,7 @@ namespace OnStreamSCArcServeExtractor
     public static class ArcServe
     {
         public const int RootSectorSize = 0x200;
-        public const bool FastDebuggingEnabled = false;
+        public static bool FastDebuggingEnabled = false;
         private static readonly Calendar ArcServeCalendar = Calendar.ReadOnly(new GregorianCalendar());
 
         /// <summary>

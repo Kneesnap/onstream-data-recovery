@@ -21,10 +21,11 @@ namespace OnStreamSCArcServeExtractor
         /// Extracts files from the tape dumps configured with <see cref="tape"/>.
         /// </summary>
         /// <param name="tape">The configuration for the tape dump file(s).</param>
-        public static void ExtractFilesFromTapeDumps(TapeDefinition tape) {
+        /// <param name="debugLogging">Whether debug logging should be logged.</param>
+        public static void ExtractFilesFromTapeDumps(TapeDefinition tape, bool debugLogging) {
             // Setup logger.
             string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + " Extraction.log");
-            using FileLogger logger = new (logFilePath, true);
+            using FileLogger logger = new (logFilePath, debugLogging, true);
 
             ExtractFilesFromTapeDumps(tape, logger);
         }

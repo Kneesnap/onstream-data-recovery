@@ -12,9 +12,14 @@ namespace OnStreamTapeLibrary
     /// </summary>
     public class SimpleLogger : ILogger, IDisposable
     {
-        private readonly object _lock = new object();
+        private readonly object _lock = new ();
+        private readonly bool _showDebugMessages;
         private bool _disposed;
         private volatile Task _currentTask = Task.CompletedTask;
+        
+        public SimpleLogger(bool debugMode = false) {
+            this._showDebugMessages = debugMode;
+        }
 
         /// <inheritdoc cref="ILogger.BeginScope{TState}"/>
         public IDisposable BeginScope<TState>(TState state) where TState : notnull {
@@ -23,26 +28,29 @@ namespace OnStreamTapeLibrary
 
         /// <inheritdoc cref="ILogger.IsEnabled"/>
         public bool IsEnabled(LogLevel logLevel) {
+            if (logLevel == LogLevel.Debug && !this._showDebugMessages)
+                return false;
+            
             lock (this._lock)
                 return !this._disposed;
         }
 
         /// <inheritdoc cref="ILogger.Log{TState}"/>
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string>? formatter) {
-            if (formatter == null)
+            if (formatter == null || (logLevel == LogLevel.Debug && !this._showDebugMessages))
                 return;
 
             lock (_lock) {
                 if (this._disposed)
                     return;
 
-                var n = Environment.NewLine;
+                string n = Environment.NewLine;
                 string exc = "";
                 if (exception != null)
                     exc = n + n + exception.GetType() + ": " + exception.Message + n + exception.StackTrace + n;
                 string fullMessage = $"[{DateTime.Now}/{logLevel.ToString()[0]}]: {formatter(state, exception)}{exc}";
 
-                this.LogFinalMessage(fullMessage);
+                this._currentTask = this._currentTask.ContinueWith(_ => this.LogFinalMessageAsync(fullMessage).ConfigureAwait(false));
             }
         }
 
@@ -50,8 +58,8 @@ namespace OnStreamTapeLibrary
         /// Handles the logging of the string.
         /// </summary>
         /// <param name="message"></param>
-        protected virtual void LogFinalMessage(string message) {
-            this._currentTask = this._currentTask.ContinueWith(_ => Console.Out.WriteLineAsync(message));
+        protected virtual async Task LogFinalMessageAsync(string message) {
+            await Console.Out.WriteLineAsync(message);
         }
         
         /// <summary>
@@ -77,7 +85,7 @@ namespace OnStreamTapeLibrary
     {
         private readonly StreamWriter _writer;
 
-        public FileLogger(string path, bool overwriteIfExists = false) {
+        public FileLogger(string path, bool debugMode = false, bool overwriteIfExists = false) : base(debugMode) {
             if (overwriteIfExists && File.Exists(path))
                 File.Delete(path);
 
@@ -85,10 +93,10 @@ namespace OnStreamTapeLibrary
             this._writer = new StreamWriter(new BufferedStream(new FileStream(path, mode, FileAccess.Write)), Encoding.UTF8);
         }
 
-        /// <inheritdoc cref="SimpleLogger.LogFinalMessage"/>
-        protected override void LogFinalMessage(string message) {
-            this._writer.WriteLine(message);
-            base.LogFinalMessage(message);
+        /// <inheritdoc cref="SimpleLogger.LogFinalMessageAsync"/>
+        protected override async Task LogFinalMessageAsync(string message) {
+            await base.LogFinalMessageAsync(message).ConfigureAwait(false);
+            await this._writer.WriteLineAsync(message).ConfigureAwait(false);
         }
         
         /// <inheritdoc cref="SimpleLogger.OnDispose"/>
