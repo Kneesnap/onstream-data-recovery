@@ -162,7 +162,7 @@ namespace ModToolFramework.Utils {
         public static bool IsDefaultArray<T>(this T[] array) {
             T defaultElement = default(T);
             for (int i = 0; i < array.Length; i++)
-                if (Equals(array[i], defaultElement))
+                if (!Equals(array[i], defaultElement))
                     return false;
 
             return true;
