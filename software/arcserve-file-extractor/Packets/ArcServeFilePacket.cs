@@ -78,6 +78,8 @@ namespace OnStreamSCArcServeExtractor.Packets
                 return new ArcServeEmptyFilePacket(tapeArchive);
             } else if (signature == ArcServeFileTrailer.FileTrailerSignature) { // File ending.
                 return new ArcServeFileTrailer(tapeArchive);
+            } else if (signature == ArcServeSessionEndPacket.PacketSignature) { // Session ending.
+                return new ArcServeSessionEndPacket(tapeArchive);
             } else if (Enum.IsDefined(typeof(ArcServeFileHeaderSignature), signature)) {
                 if (sessionHeader == null)
                     throw new NullReferenceException("Cannot create file header without a session header!");
