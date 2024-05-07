@@ -206,7 +206,7 @@ namespace OnStreamTapeLibrary
                     lastValidBlock = block;
                 
                 if (block.MissingBlockCount > 0) {
-                    if (blocksSkipped == 0 && resumeAfterError && !block.NextPhysicalBlockIsParkingZoneAndEmpty) // Resume after only the first error, unless it's the parking zone.
+                    if (blocksSkipped == 0 && resumeAfterError && !block.NextBlockSkipIsSafelySkipped) // Resume after only the first error, unless this is skip is safe / desired.
                         reader.Index = (i + 1) * OnStreamDataStream.DataSectionSize;
 
                     blocksSkipped += block.MissingBlockCount;

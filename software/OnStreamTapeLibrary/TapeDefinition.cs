@@ -65,8 +65,12 @@ namespace OnStreamTapeLibrary
                 // Search until the next position with data is found.
                 OnStreamTapeBlock? nextTapeBlock;
                 while (!blockMapping.TryGetValue(position.ToPhysicalBlock(), out nextTapeBlock)) {
-                    if (lastTapeBlock != null)
-                        lastTapeBlock.MissingBlockCount++;
+                    if (lastTapeBlock != null) {
+                        int oldMissingBlockCount = lastTapeBlock.MissingBlockCount++;
+                        if (lastTapeBlock.NextBlockSkipIsSafelySkipped || oldMissingBlockCount == 0) // All missing blocks must be safely skipped.
+                            lastTapeBlock.NextBlockSkipIsSafelySkipped = this.SkippedPhysicalBlocks.Contains(position.ToPhysicalBlock()); // Parking zones aren't in the logical block list, so we only test skipped physical blocks.
+                    }
+
                     if (!position.TryIncreaseLogicalBlock())
                         throw new EndOfStreamException($"There are no more logical blocks, and you've found {blocks.Count} blocks when there are actually {blockMapping.Count}.");
                 }
@@ -80,7 +84,7 @@ namespace OnStreamTapeLibrary
                 
                 // Test if the next block is parking zone.
                 tempPhysicalPosition.FromPhysicalBlock(position.ToPhysicalBlock());
-                nextTapeBlock.NextPhysicalBlockIsParkingZoneAndEmpty = !tempPhysicalPosition.TryIncreasePhysicalBlock() || tempPhysicalPosition.IsParkingZone;
+                nextTapeBlock.NextBlockSkipIsSafelySkipped = false; // Logical block lists will never have a parking zone as the next block.
 
                 // Increase logical block.
                 if (!position.TryIncreaseLogicalBlock())
@@ -107,8 +111,8 @@ namespace OnStreamTapeLibrary
                 while (!blockMapping.TryGetValue(position.ToPhysicalBlock(), out nextTapeBlock)) {
                     if (lastTapeBlock != null) {
                         int oldMissingBlockCount = lastTapeBlock.MissingBlockCount++;
-                        if (oldMissingBlockCount == 0 && position.IsParkingZone)
-                            lastTapeBlock.NextPhysicalBlockIsParkingZoneAndEmpty = true;
+                        if (lastTapeBlock.NextBlockSkipIsSafelySkipped || oldMissingBlockCount == 0) // All missing blocks must be safely skipped.
+                            lastTapeBlock.NextBlockSkipIsSafelySkipped = position.IsParkingZone || this.SkippedPhysicalBlocks.Contains(position.ToPhysicalBlock());
                     }
                     
                     if (!position.TryIncreasePhysicalBlock())
@@ -116,7 +120,7 @@ namespace OnStreamTapeLibrary
                 }
 
                 nextTapeBlock.MissingBlockCount = 0;
-                nextTapeBlock.NextPhysicalBlockIsParkingZoneAndEmpty = false;
+                nextTapeBlock.NextBlockSkipIsSafelySkipped = false;
                 if (!this.SkippedPhysicalBlocks.Contains(nextTapeBlock.PhysicalBlock)) {
                     blocks.Add(nextTapeBlock);
                     lastTapeBlock = nextTapeBlock;
@@ -178,9 +182,17 @@ namespace OnStreamTapeLibrary
                 for (int i = 0; i < skippedStr.Length; i++) {
                     if (UInt32.TryParse(skippedStr[i], out uint parsedBlock)) {
                         newTapeConfig.SkippedPhysicalBlocks.Add(type.ConvertLogicalBlockToPhysicalBlock(parsedBlock));
-                    } else {
-                        logger.LogError("Tape was supposed to skip block '{skippedStr}' but it was not a number!", skippedStr[i]);
+                        continue;
+                    } else if (skippedStr[i].Contains('-', StringComparison.InvariantCultureIgnoreCase)) {
+                        string[] split = skippedStr[i].Split('-', 2);
+                        if (split.Length == 2 && UInt32.TryParse(split[0], out uint parsedLow) && UInt32.TryParse(split[1], out uint parsedHigh) && parsedHigh >= parsedLow) {
+                            for (uint j = parsedLow; j <= parsedHigh; j++)
+                                newTapeConfig.SkippedPhysicalBlocks.Add(type.ConvertLogicalBlockToPhysicalBlock(j));
+                            continue;
+                        }
                     }
+                    
+                    logger.LogError("Tape was supposed to skip block '{skippedStr}' but it was not a number or a valid range!", skippedStr[i]);
                 }
             }
             

@@ -38,7 +38,9 @@ name=Whatever I want to call my tape # Optional. This will be the name of the .z
 # OnStream Specific Configuration Keys
 #hasAuxData=false # Optional. Only set this if you are 100% certain if OnStream Aux data is present or not.
 arcServeSkipExtraFileData=false # If exported files are corrupt, but still look mostly okay, try setting this to true.
-#skip=2998,2999 # Optional. This is a list of OnStream logical block IDs which should be skipped.
+#skip=2998,2999 # Optional. This is a list of OnStream logical block IDs which should be considered to be safely skippable.
+# For example, 2998 and 2999 contain data written by OnStream at the factory to mark potentially defective areas to avoid writing to.
+# Those pages should be skipped if they get in the way. Likewise, if any logical blocks do get skipped because they're defective, they should be configured here.
 
 # The parking zone information can be written here.
 # The parking zone only applies to OnStream tape dumps read with an SC-30 or SC-50 drive. (NOT an ADR-50 drive)
