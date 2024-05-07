@@ -58,6 +58,7 @@ namespace OnStreamTapeLibrary
         public List<OnStreamTapeBlock> CreateLogicallyOrderedBlockList(Dictionary<uint, OnStreamTapeBlock> blockMapping) {
             List<OnStreamTapeBlock> blocks = new ();
             OnStreamPhysicalPosition position = this.Type.FromLogicalBlock(0);
+            OnStreamPhysicalPosition tempPhysicalPosition = this.Type.CreatePosition();
 
             OnStreamTapeBlock? lastTapeBlock = null;
             for (int i = 0; i < blockMapping.Count; i++) {
@@ -70,12 +71,18 @@ namespace OnStreamTapeLibrary
                         throw new EndOfStreamException($"There are no more logical blocks, and you've found {blocks.Count} blocks when there are actually {blockMapping.Count}.");
                 }
 
+                // Setup next tape block.
                 nextTapeBlock.MissingBlockCount = 0;
                 if (!this.SkippedPhysicalBlocks.Contains(nextTapeBlock.PhysicalBlock)) {
                     blocks.Add(nextTapeBlock);
                     lastTapeBlock = nextTapeBlock;
                 }
+                
+                // Test if the next block is parking zone.
+                tempPhysicalPosition.FromPhysicalBlock(position.ToPhysicalBlock());
+                nextTapeBlock.NextPhysicalBlockIsParkingZoneAndEmpty = !tempPhysicalPosition.TryIncreasePhysicalBlock() || tempPhysicalPosition.IsParkingZone;
 
+                // Increase logical block.
                 if (!position.TryIncreaseLogicalBlock())
                     throw new EndOfStreamException($"There are no more logical blocks, and you've found {blocks.Count} blocks when there are actually {blockMapping.Count}.");
             }
@@ -98,13 +105,18 @@ namespace OnStreamTapeLibrary
                 // Search until the next position with data is found.
                 OnStreamTapeBlock? nextTapeBlock;
                 while (!blockMapping.TryGetValue(position.ToPhysicalBlock(), out nextTapeBlock)) {
-                    if (lastTapeBlock != null)
-                        lastTapeBlock.MissingBlockCount++;
+                    if (lastTapeBlock != null) {
+                        int oldMissingBlockCount = lastTapeBlock.MissingBlockCount++;
+                        if (oldMissingBlockCount == 0 && position.IsParkingZone)
+                            lastTapeBlock.NextPhysicalBlockIsParkingZoneAndEmpty = true;
+                    }
+                    
                     if (!position.TryIncreasePhysicalBlock())
                         throw new EndOfStreamException($"There are no more physical blocks, and you've found {blocks.Count} blocks when there are actually {blockMapping.Count}.");
                 }
 
                 nextTapeBlock.MissingBlockCount = 0;
+                nextTapeBlock.NextPhysicalBlockIsParkingZoneAndEmpty = false;
                 if (!this.SkippedPhysicalBlocks.Contains(nextTapeBlock.PhysicalBlock)) {
                     blocks.Add(nextTapeBlock);
                     lastTapeBlock = nextTapeBlock;

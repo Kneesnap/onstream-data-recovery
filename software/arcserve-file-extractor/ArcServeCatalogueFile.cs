@@ -150,7 +150,7 @@ namespace OnStreamSCArcServeExtractor
                     logger.LogInformation(" Damaged: '{zipEntryFullName}', File Length: {catalogFileSize}, Recovered: {zipEntryLength}", zipEntry.FullName, fileEntry.FileSizeInBytes, zipEntry.Length);
 
                     errorsFound++;
-                } else if (zipEntry == null && !(fileEntry.IsDirectory && fileEntry.FileNameLength == 0)) {
+                } else if (zipEntry == null && !((fileEntry.IsDirectory || fileEntry.FileSizeInBytes == 0) && (fileEntry.FileNameLength == 0 || fileEntry.Mode == 3))) {
                     logger.LogInformation(" Missing: '{folderPath}{fileEntryName}', File Length: {fileEntrySize}", folderPath, fileEntry.FileName, fileEntry.FileSizeInBytes);
                     errorsFound++;
                 } else {

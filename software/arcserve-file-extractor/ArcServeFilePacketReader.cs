@@ -57,6 +57,9 @@ namespace OnStreamSCArcServeExtractor
         /// <returns></returns>
         public bool TryReadPacket(uint packetSignature)
         {
+            if (packetSignature == 0)
+                return true; // This should just indicate to skip, without increasing the number of sections skipped.
+            
             ArcServeFilePacket? newPacket = ArcServeFilePacket.CreateFilePacketFromSignature(this.TapeArchive, this.LastSessionHeader, packetSignature);
             if (newPacket == null)
                 return false; // Signature wasn't a recognized packet.

@@ -10,6 +10,7 @@
         public readonly long Index; // File position of the block data within the file it was found in.
         public readonly uint PhysicalBlock; // The physical position on the tape which the block corresponds to.
         public int MissingBlockCount; // The number of blocks which are missing between this tape block and the next seen tape block.
+        public bool NextPhysicalBlockIsParkingZoneAndEmpty;
         public uint LogicalBlock => this.File.Tape.Type.ConvertPhysicalBlockToLogicalBlock(this.PhysicalBlock);
         public string LogicalBlockString => this.File.Tape.Type.ConvertPhysicalBlockToLogicalBlockString(this.PhysicalBlock);
         

@@ -176,6 +176,8 @@ namespace OnStreamTapeLibrary
 
         /// <summary>
         /// Test if the reader skipped any blocks due to them not being present since the given index.
+        /// If resuming after error is enabled, the reader will resume reading after the missing block area.
+        /// This is ignored if the missing area is parking zone.
         /// </summary>
         /// <param name="reader">The reader to test.</param>
         /// <param name="startIndex">The earliest reader position index which an error could be found at.</param>
@@ -204,7 +206,7 @@ namespace OnStreamTapeLibrary
                     lastValidBlock = block;
                 
                 if (block.MissingBlockCount > 0) {
-                    if (blocksSkipped == 0 && resumeAfterError)
+                    if (blocksSkipped == 0 && resumeAfterError && !block.NextPhysicalBlockIsParkingZoneAndEmpty) // Resume after only the first error, unless it's the parking zone.
                         reader.Index = (i + 1) * OnStreamDataStream.DataSectionSize;
 
                     blocksSkipped += block.MissingBlockCount;

@@ -6,6 +6,7 @@ namespace OnStreamSCArcServeExtractor.Packets
 {
     /// <summary>
     /// Represents a packet known to be empty.
+    /// We keep this disabled for logging purposes.
     /// </summary>
     public class ArcServeEmptyFilePacket : ArcServeFilePacket
     {

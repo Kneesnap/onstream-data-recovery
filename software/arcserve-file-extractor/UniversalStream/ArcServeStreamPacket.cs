@@ -35,7 +35,6 @@ namespace OnStreamSCArcServeExtractor.UniversalStream
                 return false;
             }
 
-            block = new ArcServeStreamHeader();
             block.Id = reader.ReadUInt32(ByteEndian.BigEndian);
             block.FileSystem = reader.ReadEnum<uint, StreamFileSystem>();
             block.Size = reader.ReadUInt64();

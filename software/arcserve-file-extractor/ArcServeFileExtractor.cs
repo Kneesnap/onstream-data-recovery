@@ -24,7 +24,7 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="debugLogging">Whether debug logging should be logged.</param>
         public static void ExtractFilesFromTapeDumps(TapeDefinition tape, bool debugLogging) {
             // Setup logger.
-            string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + " Extraction.log");
+            string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + ".log");
             using FileLogger logger = new (logFilePath, debugLogging, true);
 
             ExtractFilesFromTapeDumps(tape, logger);
@@ -91,11 +91,9 @@ namespace OnStreamSCArcServeExtractor
                     logger.LogTrace(ex, "Encountered an error while reading the data for packet {packetSignature:X8} at {currIndex}. (Start: {preReadIndex})", packetSignature, reader.GetFileIndexDisplay(), reader.GetFileIndexDisplay(preReadIndex));
                 }
 
-                if (tape.HasOnStreamAuxData && reader.WasMissingDataSkipped(preReadIndex, true, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock)) {
-                    logger.LogError(" - Skipped {blocksSkipped} missing tape block(s) from after {lastValidPhysicalBlock:X8}/{lastValidBlock}. (OnStream Specific)", blocksSkipped, lastValidBlock.PhysicalBlock, lastValidBlock.LogicalBlockString);
-                }
-
                 reader.Align(ArcServe.RootSectorSize);
+                if (tape.HasOnStreamAuxData && reader.WasMissingDataSkipped(preReadIndex, true, out int blocksSkipped, out OnStreamTapeBlock lastValidBlock))
+                    logger.LogError(" - Skipped {blocksSkipped} missing tape block(s) from after {lastValidPhysicalBlock:X8}/{lastValidBlock}. ({preReadPosition}) Reading will resume at {readerPosition}. (OnStream Specific)", blocksSkipped, lastValidBlock.PhysicalBlock, lastValidBlock.LogicalBlockString, reader.GetFileIndexDisplay(preReadIndex), reader.GetFileIndexDisplay());
             }
 
             logger.LogInformation("Finished reading tape dumps...");

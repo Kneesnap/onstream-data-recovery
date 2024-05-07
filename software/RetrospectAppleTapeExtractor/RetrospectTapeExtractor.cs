@@ -22,7 +22,7 @@ namespace RetrospectTape
         /// <param name="tape">The configuration for the tape dump file(s).</param>
         public static void ExtractFilesFromTapeDumps(TapeDefinition tape) {
             // Setup logger.
-            string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + " Extraction.log");
+            string logFilePath = Path.Combine(tape.FolderPath, tape.DisplayName + ".log");
             using FileLogger logger = new FileLogger(logFilePath, true);
 
             ExtractFilesFromTapeDumps(tape, logger);
@@ -104,7 +104,7 @@ namespace RetrospectTape
         }
 
         private static void ReadTapeDumps(DataReader reader, ILogger logger, ZipArchive mainArchive, ZipArchive snapshotArchive) {
-            RetrospectTapeFileContext context = new RetrospectTapeFileContext(mainArchive, snapshotArchive);
+            RetrospectTapeFileContext context = new (mainArchive, snapshotArchive);
             
             RetrospectDataStreamChunk? lastDefChunk = null;
             while (reader.HasMore) {
