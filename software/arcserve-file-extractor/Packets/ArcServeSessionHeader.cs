@@ -257,7 +257,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         NetWareReserved1 = DataConstants.BitFlag9,
         Compressed = DataConstants.BitFlag10,
         Encrypted = DataConstants.BitFlag11,
-        HasCatalogueSession = DataConstants.BitFlag12,
+        HasCatalogSession = DataConstants.BitFlag12,
         NoDetailInRecords = DataConstants.BitFlag13,
         HasCrcChecksum = DataConstants.BitFlag14,
         IsCheckpoint = DataConstants.BitFlag15,
@@ -273,8 +273,8 @@ namespace OnStreamSCArcServeExtractor.Packets
         CatalogUpdates = unchecked((uint)DataConstants.BitFlag31)
         
         // Andy Borman = 0x0000007 (Filtered | VolumeLevel | HasSystemObject)
-        // Frogger 2 = 0x00007400 (HasCrcChecksum | NoDetailInRecords | HasCatalogueSession | Compressed)
-        // Chicken Run = 0x00003002 (NoDetailInRecords | HasCatalogueSession | VolumeLevel)
+        // Frogger 2 = 0x00007400 (HasCrcChecksum | NoDetailInRecords | HasCatalogSession | Compressed)
+        // Chicken Run = 0x00003002 (NoDetailInRecords | HasCatalogSession | VolumeLevel)
     }
 
     /// <summary>

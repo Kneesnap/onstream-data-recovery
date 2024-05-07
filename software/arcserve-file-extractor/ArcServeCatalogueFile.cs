@@ -80,11 +80,11 @@ namespace OnStreamSCArcServeExtractor
 
                 memoryStream.Seek(0, SeekOrigin.Begin);
                 using DataReader reader = new (memoryStream);
-                ArcServeCatalogueFile catalogueFile = Read(tapeArchive, reader);
+                ArcServeCatalogueFile catalogFile = Read(tapeArchive, reader);
 
                 logger.LogInformation(string.Empty);
-                logger.LogInformation("Finding missing/damaged files in catalog entry '{zipEntryName}/{entryName}':", entry.Name, catalogueFile.Name);
-                FindMissingFilesFromCatFile(zipArchive, catalogueFile, logger);
+                logger.LogInformation("Finding missing/damaged files in catalog entry '{zipEntryName}/{entryName}':", entry.Name, catalogFile.Name);
+                FindMissingFilesFromCatFile(zipArchive, catalogFile, logger);
                 logger.LogInformation(string.Empty);
             }
         }
@@ -119,7 +119,7 @@ namespace OnStreamSCArcServeExtractor
 
             long matchesFound = 0;
             long errorsFound = 0;
-            long fileSizeFromCatalogue = 0;
+            long fileSizeFromCatalog = 0;
             long fileSizeFromZip = 0;
             long fileSizeFromZipWithDamage = 0;
             foreach (ArcServeCatalogueFileEntry fileEntry in file.Entries) {
@@ -150,7 +150,7 @@ namespace OnStreamSCArcServeExtractor
                     logger.LogInformation(" Damaged: '{zipEntryFullName}', File Length: {catalogFileSize}, Recovered: {zipEntryLength}", zipEntry.FullName, fileEntry.FileSizeInBytes, zipEntry.Length);
 
                     errorsFound++;
-                } else if (zipEntry == null) {
+                } else if (zipEntry == null && !(fileEntry.IsDirectory && fileEntry.FileNameLength == 0)) {
                     logger.LogInformation(" Missing: '{folderPath}{fileEntryName}', File Length: {fileEntrySize}", folderPath, fileEntry.FileName, fileEntry.FileSizeInBytes);
                     errorsFound++;
                 } else {
@@ -159,16 +159,17 @@ namespace OnStreamSCArcServeExtractor
                 }
 
                 lastPath = folderPath;
-                fileSizeFromCatalogue += fileEntry.FileSizeInBytes;
+                fileSizeFromCatalog += fileEntry.FileSizeInBytes;
                 fileSizeFromZipWithDamage += zipEntry?.Length ?? 0;
             }
 
+            logger.LogInformation(string.Empty);
             logger.LogInformation(" {matchesFound} files/folders were successfully recovered.", matchesFound);
-            logger.LogInformation(" {errorsFound} catalogue error{plural} found.", errorsFound > 0 ? errorsFound : "No", errorsFound == 1 ? " was" : "s were");
+            logger.LogInformation(" {errorsFound} catalog error{plural} found.", errorsFound > 0 ? errorsFound : "No", errorsFound == 1 ? " was" : "s were");
             logger.LogInformation(string.Empty);
             logger.LogInformation(" Recovered Data: {formattedSize} ({fileSizeFromZip} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromZip), fileSizeFromZip);
             logger.LogInformation(" Recovered Data With Errors: {formattedSize} ({fileSizeFromZipWithDamage} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromZipWithDamage), fileSizeFromZipWithDamage);
-            logger.LogInformation(" Full Session Data: {formattedSize} ({fileSizeFromCatalogue} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromCatalogue), fileSizeFromCatalogue);
+            logger.LogInformation(" Full Session Data: {formattedSize} ({fileSizeFromCatalog} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromCatalog), fileSizeFromCatalog);
             logger.LogInformation(string.Empty);
         }
     }
