@@ -21,7 +21,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {
-            if (ArcServe.FastDebuggingEnabled)
+            if (ArcServe.FastDebuggingEnabled && this.FileClass != ArcServeFileClass.ArcServeCatalog)
             {
                 this.Logger.LogDebug(" - File data started at {fileDataStartIndex}", reader.GetFileIndexDisplay());
                 reader.SkipBytes((long) this.FileSizeInBytes);

@@ -48,7 +48,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
 
         /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
-        public override void WriteInformation(DataReader reader)
+        public override void WriteInformation(DataReader? reader)
         {
             if (this._nonZeroBytesFound > 0)
                 this.Logger.LogError("File Packet starting at {filePacketStartIndex} was expected to be completely empty, but had {byteCount} non-zero bytes!", reader.GetFileIndexDisplay(this.ReaderStartIndex), this._nonZeroBytesFound);

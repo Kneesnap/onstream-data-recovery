@@ -18,13 +18,13 @@ namespace ModToolFramework.Utils.Data
     /// </summary>
     public class DataReader : BinaryReader
     {
-        private Stack<long> _jumpStack = new Stack<long>();
+        private Stack<long> _jumpStack = new ();
         private byte[] _buffer = new byte[16];
         public ByteEndian Endian { get; set; } = ByteEndian.LittleEndian;
         public long Index { get => this.BaseStream.Position; set => this.BaseStream.Position = value; }
-        public long Size { get => this.BaseStream.Length; }
-        public long Remaining { get => this.Size - this.Index; }
-        public bool HasMore { get => (this.Remaining > 0); }
+        public long Size => this.BaseStream.Length;
+        public long Remaining => this.Size - this.Index;
+        public bool HasMore => (this.Remaining > 0);
 
         public DataReader(Stream inStream, bool leaveOpen = false) : base(inStream, Encoding.UTF8, leaveOpen) {
         }
@@ -199,7 +199,7 @@ namespace ModToolFramework.Utils.Data
         /// <returns>loadedString</returns>
         public virtual string ReadNullTerminatedString(Encoding encoding = null) {
             bool foundEnd = false;
-            List<byte> readBytes = new List<byte>();
+            List<byte> readBytes = new ();
             while (this.HasMore) {
                 byte nextByte = this.ReadByte();
                 if (nextByte == 0x00) { // TODO: Needs to handle non-normal encoding.
@@ -291,7 +291,7 @@ namespace ModToolFramework.Utils.Data
         /// Reads a 16 bit float from the stream.
         /// </summary>
         /// <returns>16 bit float.</returns>
-        public Half ReadHalf() {
+        public new Half ReadHalf() {
             this.ReadBytesWithEndian(2);
             return DataUtils.ConvertByteArrayToHalf(this._buffer);
         }
@@ -413,6 +413,36 @@ namespace ModToolFramework.Utils.Data
             this.ReadBytesWithEndian(8);
             return DataUtils.ConvertByteArrayToULong(this._buffer);
         }
+        
+        /// <summary>
+        /// Reads an enum value from the reader.
+        /// Assumes the reference type to read is the enum's underlying type.
+        /// </summary>
+        /// <typeparam name="TEnum">The enum type.</typeparam>
+        /// <returns>readEnum</returns>
+        /// <exception cref="InvalidOperationException">Thrown if the read value is not a valid enum type.</exception>
+        [SuppressMessage("ReSharper", "SwitchExpressionHandlesSomeKnownEnumValuesWithExceptionInDefault")]
+        public TEnum ReadEnum<TEnum>() where TEnum : Enum {
+            Type underlyingType = Enum.GetUnderlyingType(typeof(TEnum));
+            TypeCode typeCode = Type.GetTypeCode(underlyingType);
+            object value = typeCode switch {
+                TypeCode.Byte => this.ReadByte(),
+                TypeCode.SByte => this.ReadSByte(),
+                TypeCode.Char => this.ReadChar(),
+                TypeCode.Int16 => this.ReadInt16(),
+                TypeCode.UInt16 => this.ReadUInt16(),
+                TypeCode.Int32 => this.ReadInt32(),
+                TypeCode.UInt32 => this.ReadUInt32(),
+                TypeCode.Int64 => this.ReadInt64(),
+                TypeCode.UInt64 => this.ReadUInt64(),
+                _ => throw new InvalidOperationException($"Cannot read enum value from primitive type {underlyingType.GetDisplayName()}. Type Code: {typeCode.CalculateName()}")
+            };
+
+            // Cast to enum's primitive type.
+            if (!Enum.IsDefined(typeof(TEnum), value))
+                throw new InvalidOperationException($"Enum {typeof(TEnum).GetDisplayName()} does not have a definition for value '{value}'.");
+            return (TEnum)value;
+        }
 
         /// <summary>
         /// Reads an enum value from the reader.
@@ -437,10 +467,13 @@ namespace ModToolFramework.Utils.Data
                 _ => throw new InvalidOperationException($"Cannot read enum value from primitive type {typeof(TPrimitive).GetDisplayName()}. Type Code: {typeCode.CalculateName()}")
             };
 
-            TEnum castedValue = (TEnum)(object)value;
+            // Cast to enum's primitive type.
+            Type underlyingType = Enum.GetUnderlyingType(typeof(TEnum));
+            object castedValue = Convert.ChangeType(value, underlyingType);
+
             if (!Enum.IsDefined(typeof(TEnum), castedValue))
                 throw new InvalidOperationException($"Enum {typeof(TEnum).GetDisplayName()} does not have a definition for value '{value}'.");
-            return castedValue;
+            return (TEnum)castedValue;
         }
         
         /// <summary>

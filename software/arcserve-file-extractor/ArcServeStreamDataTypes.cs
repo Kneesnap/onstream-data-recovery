@@ -73,7 +73,7 @@ namespace OnStreamSCArcServeExtractor
         /// </summary>
         /// <param name="logger">The logger to write the data to.</param>
         /// <param name="reader">The reader to calculate read positions with.</param>
-        public void WritePacketReadInfo(ILogger logger, DataReader reader) {
+        public void WritePacketReadInfo(ILogger logger, DataReader? reader) {
             logger.LogDebug(" - Read ArcServe Section {section}/{header} at {address}. (Header End: {streamDataStart}, Data End: {alignedDataEndIndex}){extraData}", this.GetTypeDisplayName(), this.Block, reader.GetFileIndexDisplay(this.Block.HeaderStartIndex), reader.GetFileIndexDisplay(this.BodyStartIndex), reader.GetFileIndexDisplay(this.BodyEndIndex), this.GetExtraLoggerInfo());
         }
     }
@@ -133,7 +133,7 @@ namespace OnStreamSCArcServeExtractor
             if (block.Size > Int32.MaxValue)
                 throw new DataException($"Cannot read {block.Size} bytes of stream data, it's too much.");
             
-            if (ArcServe.FastDebuggingEnabled) {
+            if (ArcServe.FastDebuggingEnabled && this is not ArcServeStreamCatalogueData) {
                 reader.Index += (long)block.Size;
                 return;
             }

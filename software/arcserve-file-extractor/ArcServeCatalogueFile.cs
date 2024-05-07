@@ -6,7 +6,9 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.IO.Compression;
+using System.Text;
 using OnStreamSCArcServeExtractor.Packets;
+using OnStreamTapeLibrary;
 
 namespace OnStreamSCArcServeExtractor
 {
@@ -18,7 +20,7 @@ namespace OnStreamSCArcServeExtractor
         public readonly List<ArcServeCatalogueFileEntry> Entries = new ();
         public readonly ArcServeSessionHeader SessionHeader;
         public string? Name;
-        public uint Unknown1;
+        public uint TapeNumber;
         public uint TapeId; // The ID which shows in ArcServe, like ID - 17BE.
         public uint SessionNumber;
 
@@ -37,7 +39,7 @@ namespace OnStreamSCArcServeExtractor
             ArcServeCatalogueFile newFile = new (header);
 
             newFile.Name = reader.ReadFixedSizeString(24);
-            newFile.Unknown1 = reader.ReadUInt32();
+            newFile.TapeNumber = reader.ReadUInt32();
             newFile.TapeId = reader.ReadUInt32();
             newFile.SessionNumber = reader.ReadUInt32();
 
@@ -68,8 +70,6 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="zipArchive">The zip archive to read from.</param>
         /// <param name="logger">The logger to write to.</param>
         public static void FindMissingFilesFromZipFile(ArcServeTapeArchive tapeArchive, ZipArchive zipArchive, ILogger logger) {
-            logger.LogInformation("Finding missing/damaged files...");
-
             foreach (ZipArchiveEntry entry in zipArchive.Entries) {
                 if (!entry.Name.EndsWith(".CAT", StringComparison.InvariantCultureIgnoreCase))
                     continue;
@@ -81,12 +81,37 @@ namespace OnStreamSCArcServeExtractor
                 memoryStream.Seek(0, SeekOrigin.Begin);
                 using DataReader reader = new (memoryStream);
                 ArcServeCatalogueFile catalogueFile = Read(tapeArchive, reader);
-                catalogueFile.SessionHeader.WriteInformation(reader);
-                
-                logger.LogInformation($"Catalogue '{entry.Name}':");
+
+                logger.LogInformation(string.Empty);
+                logger.LogInformation("Finding missing/damaged files in catalog entry '{zipEntryName}/{entryName}':", entry.Name, catalogueFile.Name);
                 FindMissingFilesFromCatFile(zipArchive, catalogueFile, logger);
-                logger.LogInformation("");
+                logger.LogInformation(string.Empty);
             }
+        }
+
+        /// <summary>
+        /// Prints catalog information to the logger.
+        /// </summary>
+        /// <param name="file">The catalog file to write information form.</param>
+        /// <param name="logger">The logger to write information to.</param>
+        /// <param name="reader">The reader to calculate display indices with.</param>
+        public static void PrintCatalogInfo(ArcServeCatalogueFile file, ILogger logger, DataReader? reader) {
+            logger.LogInformation("Catalogue '{entryName}' [Tape#: {tapeNumber}, Tape ID: {tapeId:X4}, Session#: {sessionNumber}]:", file.Name, file.TapeNumber, file.TapeId, file.SessionNumber);
+            
+            // Write session header.
+            file.SessionHeader.WriteInformation(reader);
+            
+            // Write catalog entries.
+            StringBuilder builder = new ();
+            logger.LogInformation("Entries:");
+            foreach (ArcServeCatalogueFileEntry fileEntry in file.Entries) {
+                builder.Append(' ');
+                fileEntry.PrintInformation(builder, reader);
+                logger.LogInformation("{message}", builder.ToString());
+                builder.Clear();
+            }
+            
+            logger.LogInformation(string.Empty);
         }
         
         private static void FindMissingFilesFromCatFile(ZipArchive archive, ArcServeCatalogueFile file, ILogger logger) {
@@ -117,57 +142,118 @@ namespace OnStreamSCArcServeExtractor
                 ZipArchiveEntry? zipEntry = archive.GetEntry(windowsSearchPath);
                 zipEntry ??= archive.GetEntry(unixSearchPath); 
                 if (fileEntry.IsDirectory) {
-                    zipEntry ??= archive.GetEntry(windowsSearchPath[0..^1]);
-                    zipEntry ??= archive.GetEntry(unixSearchPath[0..^1]);
+                    zipEntry ??= archive.GetEntry(windowsSearchPath[..^1]);
+                    zipEntry ??= archive.GetEntry(unixSearchPath[..^1]);
                 }
 
-                if (zipEntry != null && zipEntry.Length != fileEntry.FileSize) {
-                    logger.LogInformation($" Damaged: '{zipEntry.FullName}', File Length: {fileEntry.FileSize}, Recovered: {zipEntry.Length}");
+                if (zipEntry != null && zipEntry.Length != fileEntry.FileSizeInBytes) {
+                    logger.LogInformation(" Damaged: '{zipEntryFullName}', File Length: {catalogFileSize}, Recovered: {zipEntryLength}", zipEntry.FullName, fileEntry.FileSizeInBytes, zipEntry.Length);
 
                     errorsFound++;
                 } else if (zipEntry == null) {
-                    logger.LogInformation($" Missing: '{folderPath}{fileEntry.FileName}', File Length: {fileEntry.FileSize}");
+                    logger.LogInformation(" Missing: '{folderPath}{fileEntryName}', File Length: {fileEntrySize}", folderPath, fileEntry.FileName, fileEntry.FileSizeInBytes);
                     errorsFound++;
                 } else {
                     matchesFound++;
-                    fileSizeFromZip += fileEntry.FileSize;
+                    fileSizeFromZip += fileEntry.FileSizeInBytes;
                 }
 
                 lastPath = folderPath;
-                fileSizeFromCatalogue += fileEntry.FileSize;
+                fileSizeFromCatalogue += fileEntry.FileSizeInBytes;
                 fileSizeFromZipWithDamage += zipEntry?.Length ?? 0;
             }
 
-            logger.LogInformation($" {matchesFound} files/folders were successfully recovered.");
-            logger.LogInformation(errorsFound > 0 ? $" {errorsFound} catalogue errors were found." : " None");
+            logger.LogInformation(" {matchesFound} files/folders were successfully recovered.", matchesFound);
+            logger.LogInformation(" {errorsFound} catalogue error{plural} found.", errorsFound > 0 ? errorsFound : "No", errorsFound == 1 ? " was" : "s were");
             logger.LogInformation(string.Empty);
-            logger.LogInformation($" Recovered Data: {DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromZip)} ({fileSizeFromZip} bytes)");
-            logger.LogInformation($" Recovered Data With Errors: {DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromZipWithDamage)} ({fileSizeFromZipWithDamage} bytes)");
-            logger.LogInformation($" Full Session Data: {DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromCatalogue)} ({fileSizeFromCatalogue} bytes)");
+            logger.LogInformation(" Recovered Data: {formattedSize} ({fileSizeFromZip} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromZip), fileSizeFromZip);
+            logger.LogInformation(" Recovered Data With Errors: {formattedSize} ({fileSizeFromZipWithDamage} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromZipWithDamage), fileSizeFromZipWithDamage);
+            logger.LogInformation(" Full Session Data: {formattedSize} ({fileSizeFromCatalogue} bytes)", DataUtils.ConvertByteCountToFileSize((ulong)fileSizeFromCatalogue), fileSizeFromCatalogue);
             logger.LogInformation(string.Empty);
         }
     }
 
     public class ArcServeCatalogueFileEntry
     {
+        public StreamFileSystem FileSystemType;
         public byte Mode;
-        public long FileSize;
-        public uint LastModificationTimestamp;
+        public uint OwnerId;
+        public uint Attributes; // This contains the same data seen in the file header entry. For Windows, it's the filesystem attributes seen in WINNT.H.
+        public long FileSizeInBytes;
+        public DateTime LastModificationTime;
+        public uint FileDataPageIndex;
+        public uint FileDataPageOffset;
         public byte Flags;
-        public string FullString = string.Empty;
+        public string FullFilePath = string.Empty;
         public ushort FileNameLength;
+
+        public int RealFileNameLength => (ushort) (Math.Max(1U, this.FileNameLength) - 1);
+        public string FileName => this.FileNameLength > 0 ? this.FullFilePath[^this.RealFileNameLength..] : string.Empty;
+        public string FolderPath => this.FileNameLength > 0 ? this.FullFilePath[..^this.RealFileNameLength] : this.FullFilePath;
+        public long FileDataRawAddressIndex => ((long)this.FileDataPageIndex * PageSizeInBytes) + this.FileDataPageOffset;
         
-        public string FileName => this.FullString[^this.FileNameLength..];
-        public string FolderPath => this.FullString[..^this.FileNameLength];
-
-        private static readonly byte[] Empty3 = new byte[3];
-
         public bool IsFile => ((this.Flags & FlagIsFile) == FlagIsFile);
         public bool IsDirectory => ((this.Flags & FlagIsFile) != FlagIsFile);
         
         public const byte ModePartialPath = 1;
         public const byte ModeFullPath = 2;
         public const byte FlagIsFile = 1;
+        public const byte Signature = 0xFF;
+        public const int PageSizeInBytes = 0x4000;
+        
+        /// <inheritdoc cref="object.ToString"/>
+        public override string ToString()
+        {
+            StringBuilder builder = new();
+            this.PrintInformation(builder, null);
+            return builder.ToString();
+        }
+        
+        /// <summary>
+        /// Writes entry information to the builder.
+        /// </summary>
+        /// <param name="builder">The builder to write entry information to</param>
+        /// <param name="reader">The reader to calculate addresses with.</param>
+        public void PrintInformation(StringBuilder builder, DataReader? reader)
+        {
+            bool isDirectory = this.IsDirectory;
+            if (isDirectory) {
+                builder.Append("Folder: ");
+            } else if (this.IsFile) {
+                builder.Append("  File: ");
+            } else {
+                builder.Append(" Entry: ");
+            }
+            
+            // Write file path:
+            builder.Append(this.FullFilePath);
+
+            // File Size:
+            if (!isDirectory || this.FileSizeInBytes != 0) {
+                builder.Append(", ");
+                builder.AppendFormat("{0} ({1} bytes)", DataUtils.ConvertByteCountToFileSize((ulong) this.FileSizeInBytes), this.FileSizeInBytes);
+            }
+
+            // Show raw address.
+            builder.Append(" @ ");
+            builder.Append(reader.GetFileIndexDisplay(this.FileDataRawAddressIndex));
+            
+            // Dates.
+            builder.Append(" | Modified: ");
+            builder.Append(this.LastModificationTime);
+
+            // Misc:
+            if (this.Mode != 0)
+                builder.AppendFormat(", Mode: {0:X}", this.Mode);
+            if (this.FileSystemType != StreamFileSystem.Dos)
+                builder.AppendFormat(", File System: {0}", this.FileSystemType);
+            if (this.Attributes != 0)
+                builder.AppendFormat(", Attributes: {0:X}", this.Attributes);
+            if (this.OwnerId != 0)
+                builder.AppendFormat(", Owner ID: {0}", this.OwnerId);
+            if (this.Flags != 0)
+                builder.AppendFormat(", Flags: {0:X}", this.Flags);
+        }
 
         /// <summary>
         /// Reads a file entry from the reader.
@@ -175,32 +261,39 @@ namespace OnStreamSCArcServeExtractor
         /// <param name="reader">The reader to read from.</param>
         /// <returns>readFileEntry</returns>
         public static ArcServeCatalogueFileEntry? TryReadFileEntry(DataReader reader) {
-            if (reader.ReadByte() != 0xFF)
+            long entryStartIndex = reader.Index;
+            if (reader.ReadByte() != Signature)
                 return null;
-
+            
             ArcServeCatalogueFileEntry newEntry = new();
-            _ = reader.ReadByte(); // Unknown.
-            _ = reader.ReadByte(); // Unknown.
+            byte entrySizeInBytes = reader.ReadByte();
+            newEntry.FileSystemType = reader.ReadEnum<byte, StreamFileSystem>(); 
             newEntry.Mode = reader.ReadByte();
-            _ = reader.ReadUInt32();
-            _ = reader.ReadUInt32();
+            newEntry.OwnerId = reader.ReadUInt32(ByteEndian.LittleEndian);
+            newEntry.Attributes = reader.ReadUInt32(ByteEndian.LittleEndian);
             uint fileSizeHigh = reader.ReadUInt32(ByteEndian.LittleEndian);
             uint fileSizeLow = reader.ReadUInt32(ByteEndian.LittleEndian);
-            newEntry.FileSize = ((long)fileSizeHigh << 32) | fileSizeLow;
-            newEntry.LastModificationTimestamp = reader.ReadUInt32(ByteEndian.LittleEndian);
-            _ = reader.ReadUInt32();
-            _ = reader.ReadUInt32();
-            ushort fileNameLength = (ushort) (reader.ReadUInt16() - 1);
-            ushort pathLength = reader.ReadUInt16();
+            newEntry.FileSizeInBytes = ((long)fileSizeHigh << 32) | fileSizeLow;
+            newEntry.LastModificationTime = ArcServe.ParseTimeStamp(reader.ReadUInt32(ByteEndian.LittleEndian));
+            newEntry.FileDataPageIndex = reader.ReadUInt32();
+            newEntry.FileDataPageOffset = reader.ReadUInt32();
+            ushort fileNameLength = reader.ReadUInt16(ByteEndian.LittleEndian);
+            ushort pathLength = reader.ReadUInt16(ByteEndian.LittleEndian);
             newEntry.Flags = reader.ReadByte();
-            reader.VerifyBytes(Empty3);
+            reader.SkipBytesRequireEmpty(3);
 
+            // Ensure the size was correct.
+            long amountOfBytesRead = reader.Index - entryStartIndex;
+            if (amountOfBytesRead != entrySizeInBytes)
+                throw new DataException($"The catalog entry at {reader.GetFileIndexDisplay(entryStartIndex)} reported having {entrySizeInBytes} bytes worth of data, but we read {amountOfBytesRead} instead.");
+
+            // Read the file name.
             newEntry.FileNameLength = fileNameLength;
-            newEntry.FullString = reader.ReadStringBytes(pathLength - 1);
+            newEntry.FullFilePath = reader.ReadStringBytes(pathLength - 1);
             byte terminator = reader.ReadByte();
             if (terminator != 0x00)
                 throw new DataException($"Expected null terminator byte at 0x{reader.Index:X}, but got {terminator:X2} instead.");
-
+            
             return newEntry;
         }
     }

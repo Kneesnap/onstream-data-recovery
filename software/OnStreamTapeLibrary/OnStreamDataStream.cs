@@ -115,8 +115,8 @@ namespace OnStreamTapeLibrary
         /// </summary>
         /// <param name="reader">The reader to get the display for.</param>
         /// <returns>displayStr</returns>
-        public static string GetFileIndexDisplay(this DataReader reader) {
-            return reader.GetFileIndexDisplay(reader.Index);
+        public static string GetFileIndexDisplay(this DataReader? reader) {
+            return reader.GetFileIndexDisplay(reader?.Index ?? 0);
         }
         
         /// <summary>
@@ -125,8 +125,8 @@ namespace OnStreamTapeLibrary
         /// <param name="reader">The reader to get the display for.</param>
         /// <param name="index">The index to display.</param>
         /// <returns>displayStr</returns>
-        public static string GetFileIndexDisplay(this DataReader reader, long index) {
-            return reader.BaseStream.GetFileIndexDisplay(index);
+        public static string GetFileIndexDisplay(this DataReader? reader, long index) {
+            return reader?.BaseStream.GetFileIndexDisplay(index) ?? index.ToString("X8");
         }
         
         /// <summary>

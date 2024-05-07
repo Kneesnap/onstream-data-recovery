@@ -102,7 +102,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
 
         /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
-        public override void WriteInformation(DataReader reader)
+        public override void WriteInformation(DataReader? reader)
         {
             this.Logger.LogInformation("{fileHeaderInfo}", this);
             
@@ -146,7 +146,33 @@ namespace OnStreamSCArcServeExtractor.Packets
 
                 using Stream zipEntry = entry.Open();
                 long writerStartPosition = zipEntry.Position;
-                this.WriteFileContents(reader, zipEntry);
+
+                // Read the file logic.
+                if (this.FileClass == ArcServeFileClass.ArcServeCatalog) {
+                    // Catalogs should be written into a MemoryStream, so we can parse it and display the information, as well as writing it to the zip file.
+                    using MemoryStream memoryStream = new ();
+                    this.WriteFileContents(reader, memoryStream);
+                    
+                    // First write the data to the zip entry:
+                    memoryStream.Seek(0, SeekOrigin.Begin); // Seek the beginning.
+                    memoryStream.CopyTo(zipEntry); // Write to zip entry.
+                    
+                    // Read the catalog and write the information to the logger.
+                    try {
+                        memoryStream.Seek(0, SeekOrigin.Begin); // Seek the beginning.
+
+                        using DataReader catalogReader = new (memoryStream);
+                        ArcServeCatalogueFile catalogueFile = ArcServeCatalogueFile.Read(this.TapeArchive, catalogReader);
+                        ArcServeCatalogueFile.PrintCatalogInfo(catalogueFile, this.Logger, reader); // We intentionally pass reader instead of catalogReader, since we want to get offsets in terms of the tape reader.
+                    } catch (Exception ex) {
+                        this.Logger.LogTrace(ex, "Failed to show information for the ArcServe catalog '{fullFilePath}'.", fullFilePath);
+                    }
+                } else {
+                    // Write the file contents directly to the zip file entry.
+                    this.WriteFileContents(reader, zipEntry);
+                }
+                
+                // Ensure what we've wrote looks ok.
                 long writtenByteCount = zipEntry.Position - writerStartPosition;
                 if ((ulong) writtenByteCount != this.FileSizeInBytes && (writtenByteCount != 0 || !ArcServe.FastDebuggingEnabled))
                     this.Logger.LogError(" - Read failure! The file was supposed to be {fileSizeInBytes} bytes, but we wrote {writtenByteCount} bytes instead.", this.FileSizeInBytes, writtenByteCount);
@@ -278,7 +304,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         WindowsNtEventLog = 2,
         WindowsNtHardLink1 = 3,
         WindowsNtHardLink2 = 4,
-        ArcServeCatalogue = 5,
+        ArcServeCatalog = 5,
         EisaConfig = 6,
         DriveRoot = 10,
         SystemFileCatalog = 16,

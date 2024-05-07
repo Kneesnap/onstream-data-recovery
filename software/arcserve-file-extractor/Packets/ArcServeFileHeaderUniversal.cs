@@ -68,18 +68,11 @@ namespace OnStreamSCArcServeExtractor.Packets
             }
         }
 
-        /// <inheritdoc cref="ArcServeFilePacket.Process"/>
-        public override bool Process(DataReader reader)
-        {
-            if (ArcServe.FastDebuggingEnabled)
-                return true; // TODO: We should be skipping the correct number of chunks / bytes instead of just flat skipping.
-
-            return base.Process(reader);
-        }
-
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {
+            // Fast mode is handled by the raw data chunk class, which knows to skip when fast debugging is enabled.
+            
             // Process file data.
             uint sectionId = 0;
             foreach (ArcServeStreamData streamDataChunk in this.ReadDataChunksFromReader(reader)) {

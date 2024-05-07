@@ -56,7 +56,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// Writes information about the packet to the logger.
         /// </summary>
         /// <param name="reader">The reader which data is read from. This really should only be used for creating a string showing an index in a file.</param>
-        public abstract void WriteInformation(DataReader reader);
+        public abstract void WriteInformation(DataReader? reader);
         
         /// <summary>
         /// Process the packet after loading.

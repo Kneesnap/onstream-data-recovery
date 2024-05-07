@@ -31,7 +31,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         }
 
         /// <inheritdoc cref="ArcServeFilePacket.WriteInformation"/>
-        public override void WriteInformation(DataReader reader) {
+        public override void WriteInformation(DataReader? reader) {
             StringBuilder builder = new (" - Reached End of File");
             if (!string.IsNullOrEmpty(this.RelativeFilePath))
                 builder.AppendFormat(": {0}", this.RelativeFilePath);
