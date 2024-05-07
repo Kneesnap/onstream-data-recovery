@@ -51,8 +51,14 @@ namespace OnStreamSCArcServeExtractor.Packets
             this.FullFileName = reader.ReadFixedSizeString(520, encoding: Encoding.Unicode);
             this.DosFileName = reader.ReadFixedSizeString(28, encoding: Encoding.Unicode);
             this.FullRelativeFilePath = reader.ReadFixedSizeString(1024, encoding: Encoding.Unicode);
-            reader.SkipBytes(85); // TODO: Figure out this data.
-            reader.SkipBytes(512); // TODO: This needs disabling on one of the tapes. Can we figure out why?
+            reader.SkipBytes(85); // I've not yet figured out what this data is. Perhaps it's security filesystem info, or volume info. I see the filesize in here sometimes.
+            
+            // The actual amount of data seems to vary and sometimes cross the page border.
+            // It seems like this data is a different size on a per-tape basis. Eg: All files share the length per-tape.
+            // I've not found any data yet which allows determining the size of this data, so for now it can be controlled by a config file.
+            // The only tape session data I could find of interest was if the VolumeLevel flag was present. Not sure yet if this is an accurate determiner.
+            if (this.TapeArchive.Definition.ShouldArcServeSkipExtraSectionPerFile)
+                reader.SkipBytes(ArcServe.RootSectorSize);
         }
 
         /// <inheritdoc cref="ArcServeFileHeader.PrintSessionHeaderInformation"/>

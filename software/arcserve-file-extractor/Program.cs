@@ -1,6 +1,7 @@
 // See https://aka.ms/new-console-template for more information
 // This program is used to extract files from raw tape dumps of tapes written with the OnStream SC-X0 drive series using the ARCServe software.
 // This software is tested to be compatible with the 50GB tapes, and is potentially compatible with the 30GB tapes, but that has not been tested.
+// This software is also tested to be compatible with some non-OnStream tapes too, such as DDS.
 
 using OnStreamSCArcServeExtractor;
 using OnStreamTapeLibrary;
@@ -36,6 +37,7 @@ name=Whatever I want to call my tape # Optional. This will be the name of the .z
 
 # OnStream Specific Configuration Keys
 #hasAuxData=false # Optional. Only set this if you are 100% certain if OnStream Aux data is present or not.
+arcServeSkipExtraFileData=false # If exported files are corrupt, but still look mostly okay, try setting this to true.
 #skip=2998,2999 # Optional. This is a list of OnStream logical block IDs which should be skipped.
 
 # The parking zone information can be written here.
@@ -104,7 +106,7 @@ if (string.IsNullOrEmpty(tapeConfigFilePath)) {
 }
 
 // Setup logger for general info. A separate logger will be used for extraction.
-using SimpleLogger consoleLogger = new FileLogger(Path.Combine(new FileInfo(tapeConfigFilePath)?.Directory?.FullName ?? Directory.GetCurrentDirectory(), "tape-info.log"), debugMode, true);
+using SimpleLogger consoleLogger = new FileLogger(Path.Combine(new FileInfo(tapeConfigFilePath).Directory?.FullName ?? Directory.GetCurrentDirectory(), "tape-info.log"), debugMode, true);
 consoleLogger.LogDebug("Parsed Command Line Settings:");
 consoleLogger.LogDebug(" - Tape File Path: '{tapeConfigFilePath}'", tapeConfigFilePath);
 consoleLogger.LogDebug(" - Debug Mode: {debugMode}", debugMode);
