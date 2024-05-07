@@ -59,7 +59,7 @@ namespace OnStreamSCArcServeExtractor.Packets
             // It seems like this data is a different size on a per-tape basis. Eg: All files share the length per-tape.
             // I've not found any data yet which allows determining the size of this data, so for now it can be controlled by a config file.
             // The only tape session data I could find of interest was if the VolumeLevel flag was present. Not sure yet if this is an accurate determiner.
-            if (this.TapeArchive.Definition.ShouldArcServeSkipExtraSectionPerFile)
+            if (this.TapeArchive.Definition.ShouldArcServeSkipExtraSectionPerFile && !this.IsDirectory)
                 reader.SkipBytes(ArcServe.RootSectorSize);
         }
 
