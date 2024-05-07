@@ -48,7 +48,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         public new ArcServeFileHeaderSignature Signature => (ArcServeFileHeaderSignature) base.Signature;
         public virtual bool IsFile => !this.IsDirectory;
         public virtual bool IsDirectory => (this.Attributes & 0x10) == 0x10;
-        public override bool AppearsValid => ArcServe.IsValidLookingString(this.FullFilePath, true);
+        public override bool AppearsValid => ArcServe.IsValidLookingString(this.SharedRelativeFilePath, true); // The full file path may contain non-ASCII characters, which can't be tested.
 
         public string FullFilePath
         {
@@ -115,9 +115,6 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <inheritdoc cref="ArcServeFilePacket.Process"/>
         public override bool Process(DataReader reader)
         {
-            if (ArcServe.FastDebuggingEnabled)
-                return true;
-            
             // Determine full file path.
             long dataStreamStartIndex = reader.Index;
             ArcServeTapeArchive tapeArchive = this.TapeArchive;
@@ -151,7 +148,7 @@ namespace OnStreamSCArcServeExtractor.Packets
                 long writerStartPosition = zipEntry.Position;
                 this.WriteFileContents(reader, zipEntry);
                 long writtenByteCount = zipEntry.Position - writerStartPosition;
-                if ((ulong) writtenByteCount != this.FileSizeInBytes)
+                if ((ulong) writtenByteCount != this.FileSizeInBytes && (writtenByteCount != 0 || !ArcServe.FastDebuggingEnabled))
                     this.Logger.LogError(" - Read failure! The file was supposed to be {fileSizeInBytes} bytes, but we wrote {writtenByteCount} bytes instead.", this.FileSizeInBytes, writtenByteCount);
             } else {
                 this.Logger.LogError(" - Read failure! The file '{filePath}' was neither a file nor a directory.", fullFilePath);

@@ -43,7 +43,7 @@ namespace ModToolFramework.Utils.Data
         /// <param name="expected">The value to require</param>
         /// <param name="amount">The amount of bytes to skip</param>
         /// <exception cref="Exception">Thrown if some of the bytes are not expected</exception>
-        public void SkipBytesRequire(byte expected, int amount) {
+        public void SkipBytesRequire(byte expected, long amount) {
             long index = this.Index;
             if (amount == 0)
                 return;
@@ -52,7 +52,7 @@ namespace ModToolFramework.Utils.Data
                 throw new Exception($"Tried to skip {amount} bytes.");
 
             // Skip bytes.
-            for (int i = 0; i < amount; i++) {
+            for (long i = 0; i < amount; i++) {
                 byte nextByte = ReadByte();
                 if (nextByte != expected)
                     throw new Exception($"Reader wanted to skip {amount} bytes to reach 0x{(index + amount):X8}, but got 0x{nextByte:X2} at {(index + i):X} when 0x{expected:X2} was desired.");
@@ -72,6 +72,31 @@ namespace ModToolFramework.Utils.Data
             long byteIncrease = (interval - difference); 
             this.Index += byteIncrease;
             return byteIncrease;
+        }
+        
+        /// <summary>
+        /// Align the reader to the next multiple of the provided value, requiring all bytes skipped to be a certain value.
+        /// </summary>
+        /// <param name="interval">The alignment interval.</param>
+        /// <param name="requiredByteValue">The byte to require.</param>
+        /// <returns>The number of bytes skipped.</returns>
+        public long AlignRequire(long interval, byte requiredByteValue) {
+            long difference = (this.Index % interval);
+            if (difference == 0)
+                return 0;
+
+            long byteIncrease = (interval - difference); 
+            SkipBytesRequire(requiredByteValue, byteIncrease);
+            return byteIncrease;
+        }
+        
+        /// <summary>
+        /// Align the reader to the next multiple of the provided value, requiring all bytes skipped to be zero.
+        /// </summary>
+        /// <param name="interval">The alignment interval.</param>
+        /// <returns>The number of bytes skipped.</returns>
+        public long AlignRequireEmpty(long interval) {
+            return this.AlignRequire(interval, DataConstants.NullByte);
         }
 
         /// <summary>
@@ -99,7 +124,7 @@ namespace ModToolFramework.Utils.Data
         /// Skip a given number of bytes.
         /// </summary>
         /// <param name="byteCount">The number of bytes to skip.</param>
-        public virtual void SkipBytes(int byteCount) {
+        public virtual void SkipBytes(long byteCount) {
             if (byteCount != 0) 
                 this.Index += byteCount;
         }

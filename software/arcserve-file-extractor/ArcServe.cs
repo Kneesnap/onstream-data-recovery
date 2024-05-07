@@ -49,18 +49,19 @@ namespace OnStreamSCArcServeExtractor
 
         /// <summary>
         /// Test if the provided string looks valid and is probably not garbage data we read.
+        /// This function should not be called if the string is non-ASCII.
         /// </summary>
         /// <param name="input">The string to test.</param>
         /// <param name="allowEmpty">If the string is empty, this will be what the function returns.</param>
         /// <returns>Whether it looks valid</returns>
         public static bool IsValidLookingString(string? input, bool allowEmpty = false) {
-            if (string.IsNullOrWhiteSpace(input))
+            if (string.IsNullOrEmpty(input))
                 return allowEmpty;
             
             int validLooking = 0;
             for (int i = 0; i < input.Length; i++) {
                 char temp = input[i];
-                if ((temp >= 'a' && temp <= 'z') || (temp >= 'A' && temp <= 'Z') || (temp >= '0' && temp <= '9') || temp == '\\' || temp == '_' || temp == '.' || temp == '~' || temp == '-' || temp == '/')
+                if (temp >= ' ' && temp <= '~')
                     validLooking++;
             }
 

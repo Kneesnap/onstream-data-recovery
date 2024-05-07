@@ -78,6 +78,7 @@ for (int i = 0; i < args.Length; i++)
             case "debug":
                 debugMode = true;
                 break;
+            case "debugfast":
             case "fastdebug":
                 ArcServe.FastDebuggingEnabled = true;
                 break;
@@ -120,27 +121,11 @@ if (inputTapeCfg == null)
 // Do something with that config.
 ArcServeFileExtractor.ExtractFilesFromTapeDumps(inputTapeCfg, debugMode);
 
+// Identify files.
 using ZipArchive? archive = ArcServeFileExtractor.OpenExtractedZipArchive(inputTapeCfg, consoleLogger);
-if (archive == null)
-    return 1;
+if (archive != null) {
+    var results = FileIdentificationScanner.IdentifyFilesInZipFile(archive, consoleLogger);
+    FileIdentificationScanner.LogIdentifiedFiles(consoleLogger, results);
+}
 
-var results = FileIdentificationScanner.IdentifyFilesInZipFile(archive, consoleLogger);
-
-// Edit results to only show relevant stuff for Frogger2 tape.
-/*results.Remove(KnownFileType.TifFile);
-results.Remove(KnownFileType.GifFile);
-results.Remove(KnownFileType.BmpFile);
-results.Remove(KnownFileType.WavFile);
-results.Remove(KnownFileType.AviFile);
-results.Remove(KnownFileType.TimFile);
-results.Remove(KnownFileType.PdfFile);
-results.Remove(KnownFileType.JpegFile);
-if (results.TryGetValue(KnownFileType.WindowsExe, out var fileList))
-    fileList.RemoveAll(entry =>
-        entry?.FilePath != null && entry.Value.FilePath.Contains("\\DevStudio\\", StringComparison.InvariantCulture));
-
-results.Remove(KnownFileType.WavFile);*/
-
-// Show Results:
-FileIdentificationScanner.LogIdentifiedFiles(consoleLogger, results);
 return 0;

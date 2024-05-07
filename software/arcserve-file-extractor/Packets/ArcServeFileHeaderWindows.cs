@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils;
 using ModToolFramework.Utils.Data;
+using OnStreamTapeLibrary;
 
 namespace OnStreamSCArcServeExtractor.Packets
 {
@@ -12,7 +14,7 @@ namespace OnStreamSCArcServeExtractor.Packets
     /// </summary>
     public class ArcServeFileHeaderWindows : ArcServeFileHeader
     {
-        public uint FileAttributes { get; private set; }
+        public uint FileAttributes { get; private set; } // Appears to be the same as the parent attributes. These attributes can be found in WINNT.H (Part of Windows), or: https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
         public DateTime PreciseCreationTime { get; private set; }
         public DateTime PreciseLastAccessTime { get; private set; }
         public DateTime PreciseLastWriteTime { get; private set; }
@@ -76,7 +78,16 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {
+            if (ArcServe.FastDebuggingEnabled)
+            {
+                this.Logger.LogDebug(" - File data started at {fileDataStartIndex}", reader.GetFileIndexDisplay());
+                reader.SkipBytes((long) this.FileSizeInBytes);
+                this.Logger.LogDebug(" - File data ended at {fileDataEndIndex}", reader.GetFileIndexDisplay());
+                return;
+            }
+
             _fileReadBuffer ??= new byte[2048];
+            this.Logger.LogDebug(" - Starting reading file data at {fileDataStartIndex}", reader.GetFileIndexDisplay());
 
             // Copy bytes from the reader directly to the writer.
             ulong bytesLeft = this.FileSizeInBytes;
@@ -88,6 +99,8 @@ namespace OnStreamSCArcServeExtractor.Packets
                 writer.Write(_fileReadBuffer, 0, bytesRead);
                 bytesLeft -= (uint) bytesRead;
             }
+            
+            this.Logger.LogDebug(" - Stopped reading file data at {fileDataEndIndex}", reader.GetFileIndexDisplay());
         }
     }
 }

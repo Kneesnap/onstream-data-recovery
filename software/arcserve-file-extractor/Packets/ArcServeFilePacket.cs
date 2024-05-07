@@ -21,6 +21,11 @@ namespace OnStreamSCArcServeExtractor.Packets
         public readonly uint Signature;
         
         /// <summary>
+        /// The signature which identifies the packet.
+        /// </summary>
+        public long ReaderStartIndex;
+        
+        /// <summary>
         /// Returns whether or not the data read for this packet appears to be an intended occurrence of the packet, or if the signature was seen by coincidence in data which was not supposed to be a packet.
         /// </summary>
         public abstract bool AppearsValid { get; }
@@ -69,7 +74,9 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <exception cref="NullReferenceException">Thrown if the session header is null when it is necessary for it to not be null.</exception>
         public static ArcServeFilePacket? CreateFilePacketFromSignature(ArcServeTapeArchive tapeArchive, ArcServeSessionHeader? sessionHeader, uint signature)
         {
-            if (signature == ArcServeFileTrailer.FileTrailerSignature) { // File ending.
+            if (signature == 0) { // Empty.
+                return new ArcServeEmptyFilePacket(tapeArchive);
+            } else if (signature == ArcServeFileTrailer.FileTrailerSignature) { // File ending.
                 return new ArcServeFileTrailer(tapeArchive);
             } else if (Enum.IsDefined(typeof(ArcServeFileHeaderSignature), signature)) {
                 if (sessionHeader == null)

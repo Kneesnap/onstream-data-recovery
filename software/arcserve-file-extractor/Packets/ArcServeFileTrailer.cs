@@ -15,7 +15,7 @@ namespace OnStreamSCArcServeExtractor.Packets
         public byte Unknown { get; private set; }
 
         /// <inheritdoc cref="ArcServeFilePacket.AppearsValid"/>
-        public override bool AppearsValid => ArcServe.IsValidLookingString(this.RelativeFilePath) || (string.IsNullOrEmpty(this.RelativeFilePath) && this.CrcChecksum == 0 && this.Unknown == 0);
+        public override bool AppearsValid => ArcServe.IsValidLookingString(this.RelativeFilePath, true) && !this.EncounteredErrorWhileLoading;
 
         public ArcServeFileTrailer(ArcServeTapeArchive tapeArchive) : base(tapeArchive, FileTrailerSignature)
         {

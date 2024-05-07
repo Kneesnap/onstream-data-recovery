@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using ModToolFramework.Utils.Data;
+using OnStreamTapeLibrary;
 
 namespace OnStreamSCArcServeExtractor.Packets
 {
@@ -19,7 +21,16 @@ namespace OnStreamSCArcServeExtractor.Packets
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {
+            if (ArcServe.FastDebuggingEnabled)
+            {
+                this.Logger.LogDebug(" - File data started at {fileDataStartIndex}", reader.GetFileIndexDisplay());
+                reader.SkipBytes((long) this.FileSizeInBytes);
+                this.Logger.LogDebug(" - File data ended at {fileDataEndIndex}", reader.GetFileIndexDisplay());
+                return;
+            }
+            
             _fileReadBuffer ??= new byte[2048];
+            this.Logger.LogDebug(" - Starting reading file data at {fileDataStartIndex}", reader.GetFileIndexDisplay());
 
             // Copy bytes from the reader directly to the writer.
             ulong bytesLeft = this.FileSizeInBytes;
@@ -31,6 +42,8 @@ namespace OnStreamSCArcServeExtractor.Packets
                 writer.Write(_fileReadBuffer, 0, bytesRead);
                 bytesLeft -= (uint) bytesRead;
             }
+            
+            this.Logger.LogDebug(" - Stopped reading file data at {fileDataEndIndex}", reader.GetFileIndexDisplay());
         }
     }
 }

@@ -50,7 +50,7 @@ namespace OnStreamTapeLibrary
                     exc = n + n + exception.GetType() + ": " + exception.Message + n + exception.StackTrace + n;
                 string fullMessage = $"[{DateTime.Now}/{logLevel.ToString()[0]}]: {formatter(state, exception)}{exc}";
 
-                this._currentTask = this._currentTask.ContinueWith(_ => this.LogFinalMessageAsync(fullMessage).ConfigureAwait(false));
+                this._currentTask = this._currentTask.ContinueWith(_ => this.LogFinalMessageAsync(fullMessage).Wait());
             }
         }
 
@@ -59,7 +59,7 @@ namespace OnStreamTapeLibrary
         /// </summary>
         /// <param name="message"></param>
         protected virtual async Task LogFinalMessageAsync(string message) {
-            await Console.Out.WriteLineAsync(message);
+            await Console.Out.WriteLineAsync(message).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -73,6 +73,7 @@ namespace OnStreamTapeLibrary
         /// <inheritdoc cref="IDisposable.Dispose"/>
         public void Dispose() {
             lock (_lock) {
+                this._currentTask.Wait();
                 this.OnDispose();
             }
         }

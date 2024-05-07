@@ -68,6 +68,15 @@ namespace OnStreamSCArcServeExtractor.Packets
             }
         }
 
+        /// <inheritdoc cref="ArcServeFilePacket.Process"/>
+        public override bool Process(DataReader reader)
+        {
+            if (ArcServe.FastDebuggingEnabled)
+                return true; // TODO: We should be skipping the correct number of chunks / bytes instead of just flat skipping.
+
+            return base.Process(reader);
+        }
+
         /// <inheritdoc cref="ArcServeFileHeader.WriteFileContents"/>
         protected override void WriteFileContents(DataReader reader, Stream writer)
         {

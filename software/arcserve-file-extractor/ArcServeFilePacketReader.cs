@@ -57,29 +57,26 @@ namespace OnStreamSCArcServeExtractor
         /// <returns></returns>
         public bool TryReadPacket(uint packetSignature)
         {
-            if (packetSignature == 0)
-                return true; // We don't load a packet, but we also don't consider this a failure. We're just going to let it skip ahead.
-
             ArcServeFilePacket? newPacket = ArcServeFilePacket.CreateFilePacketFromSignature(this.TapeArchive, this.LastSessionHeader, packetSignature);
             if (newPacket == null)
                 return false; // Signature wasn't a recognized packet.
 
             this.ShowSkippedSectorInfo();
             this.TapeArchive.OrderedPackets.Add(newPacket);
-            long packetReadStartIndex = this.Reader.Index;
+            long packetReadStartIndex = newPacket.ReaderStartIndex = this.Reader.Index;
             try {
                 newPacket.LoadFromReader(this.Reader); // Load from the reader.
             } catch {
                 newPacket.EncounteredErrorWhileLoading = true;
 
                 // Ensure we can see what actually caused the error.
+                bool displayAnyways = newPacket.AppearsValid;
                 if (newPacket.AppearsValid) {
-                    newPacket.WriteInformation(this.Reader);
-                } else {
                     // Avoid printing garbage text characters if we can avoid it. It's not a huge deal but it can be annoying.
-                    this.TapeArchive.Logger.LogError("Failed to read packet of type {packetType} from {startIndex}. (The data was too broken to display)", newPacket.GetTypeDisplayName(), this.Reader.GetFileIndexDisplay(packetReadStartIndex));
+                    newPacket.WriteInformation(this.Reader);
                 }
-
+                
+                this.TapeArchive.Logger.LogError("Failed to read packet of type {packetType} from {startIndex}.{extraMessage}", newPacket.GetTypeDisplayName(), this.Reader.GetFileIndexDisplay(packetReadStartIndex), displayAnyways ? string.Empty : " (The data was too broken to display)");
                 throw;
             }
 
