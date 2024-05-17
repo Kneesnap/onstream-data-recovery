@@ -45,10 +45,9 @@ However, I do not think I will consider sending tapes into a professional data r
 **They were never capable of recovering the data:**  
 They clearly didn't even have an OnStream SC-50 tape drive, because if they did, any version of the official Linux kernel from the past 10-20 years shipped with a driver capable of dumping any OnStream tape.  
 So, that leaves them with that proprietary machine they mentioned. With the benefit of hindsight and additional research, I believe they were absolutely not capable of recovering the data.  
-OnStream used technology that no other tape drives did. One example of the custom hardware would be the dedicated data processing chip (ASIC), which was designed specifically for their machines, as opposed to the common chips available on other drives such as Travan.  
-Another example would be how dense the data was packed on the tape, with no other tape manufacturers of the era coming close to having 192 data tracks on the physical tape.  
+OnStream used technology that no other tape drives did. One example of the custom hardware would be the dedicated data processing chip (ASIC), which was designed specifically for their machines, as opposed to the common chips used in other drives such as Travan.  
 The custom hardware was designed from scratch for OnStream tape drives so they had more storage capacity than any other tape company could at the time.  
-None of it was shared in any other tape drive either. This effectively means that the only way to read data off of one of these tapes is to use one of the original tape drives or the hardware inside of one.  
+None of it was shared with any other tape drive either. This effectively means that the only way to read data off of one of these tapes is to use one of the original tape drives or the hardware inside of one.  
 In other words, whatever machine they put the the tape into was NOT compatible with OnStream tapes.  
 I don't know why they claimed to be able to recover data from OnStream tapes, but it was downright false advertising.  
 
