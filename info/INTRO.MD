@@ -26,19 +26,20 @@ My efforts to fix the drive were let's say unsuccessful, so I looked for another
 That drive was advertised as compatible with these tapes after all.
 When it arrived, it appeared to work. I was able to read/write data using test tapes, there was no auto-ejection, and I even recovered the data from another tape for a different game by the same company.  
 But I still had a problem: the Frogger tape could still not be read. When I would ask the drive to read the tape, it would return a generic error status without even attempting to read anything.  
-I was using the open source Linux `st` driver to talk to the driver, so I went as far as to review its source code to ensure there was nothing else I could do to the drive.
-At this point, I incorrectly concluded that there must have been a problem with the tape itself, and it was damaged.  
+I was using the open source Linux `st` driver to talk to the tape drive, and I went as far as to review its source code to ensure there was nothing else I could do to the drive.
+After not finding anything, I incorrectly concluded that there must have been a problem with the tape itself, and it was damaged.  
 What had actually happened was that the ADR-50e drive was advertised as compatible, but it wasn't so simple. It was only compatible with tapes which were either written with an ADR-50e drive or written with certain supported software.  
-At this point, I didn't even know what software had been used to write the data, let alone this obscure quirk of the tape drive which was advertised as compatible after all.  
+The Frogger tape was written with an OnStream SC-50 drive, and was not written using forward-compatible software it turns out.  
+At this point I didn't even know what software had been used to write the data, let alone this obscure quirk of the tape drive which was advertised as compatible after all.  
 So assuming the tape was damaged/defective, I sent it in to a professional data recovery company. What was the worst that could happen...?    
 
 **Melted Pinch Roller:**  
 ![Melted Pinch Roller](/pictures/visual-aids/melted-pinch-roller.jpg)  
 
 ### 2) Professional Data Recovery Sucks  
-I found a company whose website said specifically that they could recover data from OnStream tapes, and they had good non-botted reviews as far as I could tell.  
+I found a company whose website said specifically that they could recover data from OnStream tapes, and they had good non-botted reviews as far as I could tell.
 I even got in contact with the general manager who made it sound like they had created their own proprietary machine which they could configure to read data from any tape.  
-Perhaps they were fine for common data storage types like hard drives or SSDs. Those should be easier since there are advanced recovery tools available for them.  
+Perhaps they were fine for common data storage types like hard drives or SSDs, but my experience with tapes was awful.   
 However, I do not think I will consider sending tapes into a professional data recovery company again, even for more common digital tape formats.  
 
 **They were never capable of recovering the data:**  
