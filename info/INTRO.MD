@@ -9,10 +9,9 @@ This tape is believed to be the only backup of the final game source code, game 
 To me, this data was priceless to recover. But how does one even read/write data from a tape? Why did they even use tapes?  
 Back in 2000, when the game was made, the average hard drive size seems to have been approximately 10GB, and had much less longevity.
 OnStream tapes were very appealing since they could offer 50GB cartridges at a price cheaper than most hard drives!  
-Tapes are great for backups and have very high longevity when stored properly, and were easy to install/use.  
-A tape drive could be plugged into a computer just as easily as a CD drive or floppy disk drive.  
-Unfortunately, while the tapes have good longevity, these tape drives did not. OnStream, the company who made the tapes and tape drives, ceased operations in 2003, after only just releasing their first drive in 1999.  
-These drives are uncommon, especially the model which supports 50GB tapes. So, the first big hurdle was finding a compatible tape drive.  
+Tapes are great for backups and have very high longevity when stored properly, and were just as easy to install/use as a CD drive.  
+Unfortunately, while the tapes have good longevity, the tape drives required to read/write from the tapes did not. OnStream, the company who made the tapes and tape drives, ceased operations in 2003, after only just releasing their first drive in 1999.  
+The drives are also somewhat uncommon, especially the model which supports 50GB tapes. So, the first big hurdle was finding a compatible tape drive.  
 
 **Tape Picture:**  
 ![Picture of the tape](/pictures/visual-aids/frogger2-tape-scan.jpg)
