@@ -38,20 +38,19 @@ So assuming the tape was damaged/defective, I sent it in to a professional data 
 
 ### 2) Professional Data Recovery Sucks  
 I found a company whose website said specifically that they could recover data from OnStream tapes, and they had good non-botted reviews as far as I could tell.
-I even got in contact with the general manager who made it sound like they had created their own proprietary machine which they could configure to read data from any tape.  
-Perhaps they were fine for common data storage types like hard drives or SSDs, but my experience with tapes was awful.   
+I even got in contact with the general manager who made it sound like they had created their own proprietary machine which they could configure to read data from any tape.
+Perhaps they were fine for common data storage types like hard drives or SSDs, but my experience with them was awful.
 However, I do not think I will consider sending tapes into a professional data recovery company again, even for more common digital tape formats.  
 
 **They were never capable of recovering the data:**  
 They clearly didn't even have an OnStream SC-50 tape drive, because if they did, any version of the official Linux kernel from the past 10-20 years shipped with a driver capable of dumping any OnStream tape.  
-Regardless of if they actually had a proprietary machine, with the benefit of hindsight and additional research, I believe they were absolutely not capable of recovering the data.  
+So, that leaves them with that proprietary machine they mentioned. With the benefit of hindsight and additional research, I believe they were absolutely not capable of recovering the data.  
 OnStream used technology that no other tape drives did. One example of the custom hardware would be the dedicated data processing chip (ASIC), which was designed specifically for their machines, as opposed to the common chips available on other drives such as Travan.  
 Another example would be how dense the data was packed on the tape, with no other tape manufacturers of the era coming close to having 192 data tracks on the physical tape.  
-The entire data processing pipeline from the physical tape to chunks of digital uses custom hardware designed from scratch for OnStream tape drives, because it let OnStream get way more capacity than any other tape company could at the time.  
-None of it was shared in any other tape drive. This effectively means that the only way to read data off of one of these tapes is to use one of the original tape drives or the hardware inside of one.  
-In other words, whatever machine they put the the tape I was recovering on was NOT compatible with OnStream tapes.  
-I don't know why they claimed to be able to recover data from OnStream tapes, but it's downright false advertising for their website to claim they can recover OnStream data.  
-It's possible they saw the tape had the same physical size as other quarter-inch tape formats, and just put the tape on some ancient incompatible machine thinking that could get the data.  
+The custom hardware was designed from scratch for OnStream tape drives so they had more storage capacity than any other tape company could at the time.  
+None of it was shared in any other tape drive either. This effectively means that the only way to read data off of one of these tapes is to use one of the original tape drives or the hardware inside of one.  
+In other words, whatever machine they put the the tape into was NOT compatible with OnStream tapes.  
+I don't know why they claimed to be able to recover data from OnStream tapes, but it was downright false advertising.  
 
 **What this company should have done:**  
 This company should have not advertised the capability of recovering data from OnStream tapes.  
@@ -61,20 +60,20 @@ The company should not have told me they could recover data from this tape.
 **What this company actually did:**  
 This company specifically advertised that they could recover data from OnStream tapes, and I was given an estimate of a week.  
 Instead, over the span of about a month I received very infrequent and vague communications from the company despite me providing extremely detailed technical information and questions.  
-While this was going on, I received more tapes and did further testing & research on my own, eventually discovering the true problem was needing the SC-50 tape drive, not the tape.  
+While this was going on, I did further testing & research on my own, eventually discovering the true problem was needing the SC-50 tape driver, and that the tape was likely not damaged.  
 Since data recovery was taking so long and it didn't sound like progress was getting made in data recovery, I asked for the tape to be sent back to me.  
-As part of that response, I was assured that "it will perform the way it did when we received it". What an bleeping lie. The tape I got back had been ripped in several spots, and stitched (spliced) back together.
+The company sent the tape back and assured me that "it will perform the way it did when we received it". What an bleeping lie. The tape I got back had been ripped in several spots, and stitched (spliced) back together.
 The only silver lining is that since I made sure to pick a company that had a "no recovery, no charge" policy, I didn't have to pay the thousands of dollars they would have charged.  
 ![Screenshot of the data recovery website](/pictures/visual-aids/data-recovery-screenshot.png)  
 
 ### 3) The Realization  
-It was too late. The damage had been done by the data recovery company, and upon finally locating another SC-50 tape drive (a working one this time), my worst fears were confirmed.  
-When inserting a tape, the drive reads special reserved parts of the tape for information like what kind of tape is inserted, what parts of the tape have factory defects, etc.  
+It was too late. The damage had been done by the data recovery company, and upon finally locating another SC-50 tape drive (a working one this time), my worst fears were confirmed.
+When inserting a tape, the drive reads special reserved parts of the tape for information like what kind of tape is inserted, what parts of the tape have factory defects, etc.
 Only after this process is complete does the drive respond to any requests by the computer.  
-The splices didn't just prevent reading from the spliced area, but the splices impacted the drive so severely that upon just putting the tape into the drive, it would enter a state of infinitely trying to re-read the spliced area.  
+The splices didn't just prevent reading from the spliced area, but the splices impacted the drive so severely that upon just putting the tape into the drive, it would enter a state of infinitely trying to re-read the spliced area.
 It wasn't even possible for the computer to interrupt this process, since the drive did not respond to any commands from the computer until it finished this "initialization" phase.  
 This was devastating, and there was a degree of panic & stress. I had just the only copy of the development data for a game I cared deeply about. All because I misdiagnosed the problem.
-Flooded with thoughts like "Was I too impatient when diagnosing the problem?" or "Why did I do trust this data recovery company, I should have pressed harder!??", this is probably where the story should have stopped.  
+Flooded with thoughts like "Was I too impatient when diagnosing the problem?" or "Why did I do trust this data recovery company, I should have pressed harder!??", this is probably where the story should have stopped.
 But those thoughts were short-lived. I care about this data, and I happen to know a thing or two about computers.  
 
 **Splice Picture:**  
@@ -89,8 +88,8 @@ But if you asked me at the time, that wasn't what I was thinking about. I burned
 Months of effort was spent understanding the drive, reverse engineering its firmware, studying its SCSI command interface, reading documentation, digging up patents, etc.  
 While much was learned about the drive, the key breakthrough ended up being one of the simplest ideas.  
 If the initialization process was the problem, then what if we were to skip the initialization process with?  
-By running the initialization process by inserting an undamaged tape, we can do the initialization process as normal. Then, by soldering some wires, we could fake the electrical signals the drive used to test if a tape had been ejected.  
-Then, we could insert the damaged tape. and thus have the drive in a state where it is willing to accept commands while the tape we want to recover is inserted.  
+By running the initialization process by inserting an undamaged tape, we can do the initialization process as normal. Then, by soldering some wires, we could fake the electrical signals the drive used to test if a tape had been ejected.
+Then, we could insert the damaged tape. and thus have the drive in a state where it is willing to accept commands while the tape we want to recover is inserted.
 Using this trick, on April 5th, 2023, after months of effort, the first real chunks of data were successfully extracted from the tape.  
 From this point, it was just a matter of dumping all of the data, and figuring out the format, right? Right?  
 
@@ -117,12 +116,11 @@ In order to convert the files into a usable format (.zip), we have to cut out AR
 Thankfully, the ARCserve format wasn't very complex and I figured it out pretty quickly.  
 However, with my program many many large files were corrupted.  
 After spending some time debugging & manually analyzing the tape data dumps, it became apparent that ARCserve was using an undocumented mode for reading the tape.  
-This is explained in more depth in [the guide](/info/RAW_DUMP.MD), but ARCServe was using a feature not documented in the [official OnStream driver development document](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf).  
+This is explained in more depth in [the guide](/info/RAW_DUMP.MD), but ARCServe was using a feature not documented in the [official OnStream driver development document](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf) which changed the physical pattern in which data was written on the tape, meaning data would be read out order.  
 This undocumented feature allowed ARCServe to read and write data in a completely different physical pattern from what the documentation described.  
-After enough experimentation, eventually I completely reverse engineered the layout of how data is organized when it is physically written to the tape.  
-And with that experience, I was able to fix my software to automatically reorder the tape data chunks so my program would read the file data in order, causing most files to not be corrupted.  
-It still wasn't enough. Even after fixing the data ordering issue, I still saw errors which I didn't expect to see.  
-This time it didn't take long to see that there was missing data which was located in a position of the tape which [the documentation](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf) explicitly states "no user data can be recorded".  
+I had to heavily modify both the driver and my software, but after enough experimentation eventually I completely reverse engineered the layout of how data is organized when it is physically written to the tape.  
+It still wasn't enough. Even after fixing the ordering problem, I still file corruption which I didn't expect to see.  
+This time it didn't take long to see that there was missing data located in a position of the tape which [the driver documentation](/archive/documents/ADR%20Driver%20Development%20Specifications%201.3.pdf) explicitly states "no user data can be recorded".  
 So, I modified the open source driver and the dumping program again to read the area "where no user data can be recorded" to match ARCserve's behavior.  
 Finally, after months of reverse engineering of ARCServe, the drive firmware, and other garbage, the program worked, and the data was saved.  
 Source code for the extraction program is included [here](/software/arcserve-file-extractor/).  
