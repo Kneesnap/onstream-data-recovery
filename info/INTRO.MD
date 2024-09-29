@@ -4,7 +4,7 @@ This should serve as a warning, because learning from my mistakes will prevent y
 This took place over the span of months, and many details and side-tangents have been omitted for clarity.  
 
 ## My Story
-I received a tape containing the "end of project" development for Frogger 2: Swampy's Revenge, part of my favorite childhood franchise.  
+I received a tape containing the "end of project" development for Frogger 2: Swampy's Revenge, part of my favorite childhood video game franchise.  
 This tape is believed to be the only backup of the final game source code, game assets, and other development data.  
 To me, this data was priceless to recover. But how does one even read/write data from a tape? Why did they even use tapes?  
 Back in 2000, when the game was made, the average hard drive size seems to have been approximately 10GB, and had much less longevity.
