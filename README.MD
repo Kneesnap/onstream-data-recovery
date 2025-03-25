@@ -27,7 +27,7 @@ I've done my best to include as many tools, documentation, and information as po
  - It is a good idea to manually spin the tape wheel a little bit before putting a tape in a drive. Due to the age of these tapes, they seem prone to tearing if some manual spinning is not done first.
  
  ## Helpful Resources  
- - [Archived Data](/archives/)
+ - [Archived Data](/archive/)
  - [OnStream Website Archive](https://web.archive.org/web/20030130111054/http://www.onstreamdata.com/)  
  - ['osst' Linux Driver Website](https://osst.sourceforge.net/)  
  - ['osst' Driver Source Code](https://github.com/Kneesnap/osst) ([Original Repository](https://sourceforge.net/projects/osst/) [^1])  
