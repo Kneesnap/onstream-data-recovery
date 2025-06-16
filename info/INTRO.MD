@@ -37,7 +37,7 @@ So assuming the tape was damaged/defective, I sent it in to a professional data 
 ![Melted Pinch Roller](/pictures/visual-aids/melted-pinch-roller.jpg)  
 
 ### 2) Professional Data Recovery Sucks  
-I found a company whose website said specifically that they could recover data from OnStream tapes, and they had good non-botted reviews as far as I could tell.
+I found a company named ACE Data Recovery whose website said specifically that they could recover data from OnStream tapes, and they had good non-botted reviews as far as I could tell.
 I even got in contact with the general manager who made it sound like they had created their own proprietary machine which they could configure to read data from any tape.
 Perhaps they were fine for common data storage types like hard drives or SSDs, but my experience with them was awful.
 However, I do not think I will consider sending tapes into a professional data recovery company again, even for more common digital tape formats.  
@@ -52,21 +52,21 @@ In other words, whatever machine they put the the tape into was NOT compatible w
 I don't know why they claimed to be able to recover data from OnStream tapes, but it was downright false advertising.  
 
 **What this company should have done:**  
-This company should have not advertised the capability of recovering data from OnStream tapes.  
-The company should have made the risks clear they they didn't know if whatever machine they used was even capable of recovering data from the tape instead of pretending they knew it was.  
-The company should not have told me they could recover data from this tape.  
+"ACE Data Recovery" should have not advertised the capability of recovering data from OnStream tapes.  
+"ACE Data Recovery" should have made the risks clear they they didn't know if whatever machine they used was even capable of recovering data from the tape instead of pretending they knew it was.  
+"ACE Data Recovery" should not have told me they could recover data from this tape.  
 
-**What this company actually did:**  
-This company specifically advertised that they could recover data from OnStream tapes, and I was given an estimate of a week.  
-Instead, over the span of about a month I received very infrequent and vague communications from the company despite me providing extremely detailed technical information and questions.  
+**What "ACE Data Recovery" actually did:**  
+"ACE Data Recovery" specifically advertised that they could recover data from OnStream tapes, and I was given an estimate of a week.  
+Instead, over the span of about a month I received very infrequent and vague communications from "ACE Data Recovery" despite me providing extremely detailed technical information and questions.  
 While this was going on, I did further testing & research on my own, eventually discovering the true problem was needing the SC-50 tape driver, and that the tape was likely not damaged.  
 Since data recovery was taking so long and it didn't sound like progress was getting made in data recovery, I asked for the tape to be sent back to me.  
-The company sent the tape back and assured me that "it will perform the way it did when we received it". What an bleeping lie. The tape I got back had been ripped in several spots, and stitched (spliced) back together.
+ACE sent the tape back and assured me that "it will perform the way it did when we received it". What an bleeping lie. The tape I got back had been ripped in several spots, and stitched (spliced) back together.
 The only silver lining is that since I made sure to pick a company that had a "no recovery, no charge" policy, I didn't have to pay the thousands of dollars they would have charged.  
 ![Screenshot of the data recovery website](/pictures/visual-aids/data-recovery-screenshot.png)  
 
 ### 3) The Realization  
-It was too late. The damage had been done by the data recovery company, and upon finally locating another SC-50 tape drive (a working one this time), my worst fears were confirmed.
+It was too late. The damage had been done by "ACE Data Recovery", and upon finally locating another SC-50 tape drive (a working one this time), my worst fears were confirmed.
 When inserting a tape, the drive reads special reserved parts of the tape for information like what kind of tape is inserted, what parts of the tape have factory defects, etc.
 Only after this process is complete does the drive respond to any requests by the computer.  
 The splices didn't just prevent reading from the spliced area, but the splices impacted the drive so severely that upon just putting the tape into the drive, it would enter a state of infinitely trying to re-read the spliced area.
